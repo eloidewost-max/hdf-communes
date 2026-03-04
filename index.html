@@ -34,9 +34,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .legend-count { font-size: 10px; color: #999; margin-left: auto; padding-left: 8px; }
 
 #info {
-  position: absolute; top: 10px; right: 10px; z-index: 1000;
-  padding: 14px 16px;
-  font-size: 13px; min-width: 240px; display: none;
+  position: fixed; z-index: 1100;
+  padding: 14px 16px; pointer-events: none;
+  font-size: 13px; min-width: 240px; max-width: 320px; display: none;
 }
 #info h3 { font-size: 15px; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.3px; }
 #info .detail { margin: 3px 0; }
@@ -136,13 +136,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .data-year { font-size: 11px; color: #aaa; font-style: italic; margin-left: 4px; }
 
 /* --- Mode-specific overrides --- */
-.surv-mode #info { top: auto; bottom: 30px; }
-.prosp-mode #info { top: auto; bottom: 30px; }
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
   #stats-panel { top: auto; bottom: 0; right: 0; left: 0; width: 100%; max-height: 40vh; border-radius: 10px 10px 0 0; }
-  #info { top: auto; bottom: 0; right: 0; left: 0; width: 100%; min-width: unset; border-radius: 10px 10px 0 0; }
   #filter-bar { max-width: 95vw; }
   #surv-filters { flex-direction: column; align-items: flex-start; }
   #mode-toggle { left: 5px; }
@@ -608,6 +605,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
   // Info panel
   var infoPanel = document.getElementById('info');
+  function positionInfo(evt) {
+    var x = evt.clientX + 15;
+    var y = evt.clientY + 15;
+    var w = infoPanel.offsetWidth;
+    var h = infoPanel.offsetHeight;
+    if (x + w > window.innerWidth) x = evt.clientX - w - 15;
+    if (y + h > window.innerHeight) y = evt.clientY - h - 15;
+    infoPanel.style.left = x + 'px';
+    infoPanel.style.top = y + 'px';
+  }
+
   function showInfo(feature) {
     var code = feature.properties.codgeo;
     var m = maires[code];
@@ -725,10 +733,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       layer.on({
         mouseover: function(e) {
           showInfo(feature);
+          positionInfo(e.originalEvent);
           e.target.setStyle({ weight: 2, color: '#fff', opacity: 1 });
           e.target.bringToFront();
         },
+        mousemove: function(e) {
+          positionInfo(e.originalEvent);
+        },
         mouseout: function(e) {
+          infoPanel.style.display = 'none';
           geoLayer.resetStyle(e.target);
         },
         click: function(e) {
