@@ -10,40 +10,48 @@
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 #map { width: 100vw; height: 100vh; background: #1a1a2e; }
 
+/* --- Glassmorphism card base --- */
+#legend, #info, #title-bar, #stats-panel, #surv-filters, #filter-bar {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
 #legend {
   position: absolute; bottom: 30px; left: 10px; z-index: 1000;
-  background: rgba(255,255,255,0.95); padding: 14px 16px;
-  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+  padding: 14px 16px; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
   font-size: 13px; max-width: 280px;
 }
-#legend h3 { margin-bottom: 8px; font-size: 14px; }
-.legend-item { display: flex; align-items: center; margin: 4px 0; cursor: pointer; }
-.legend-item:hover { background: #f0f0f0; border-radius: 4px; }
+#legend h3 { margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.legend-item { display: flex; align-items: center; margin: 4px 0; cursor: pointer; padding: 2px 4px; }
+.legend-item:hover { background: rgba(0,0,0,0.05); border-radius: 4px; }
 .legend-swatch {
   width: 16px; height: 16px; border-radius: 3px;
   margin-right: 8px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.2);
 }
-.legend-label { font-size: 12px; }
-.legend-count { font-size: 11px; color: #666; margin-left: auto; padding-left: 8px; }
+.legend-label { font-size: 11px; color: #444; }
+.legend-count { font-size: 10px; color: #999; margin-left: auto; padding-left: 8px; }
 
 #info {
   position: absolute; top: 10px; right: 10px; z-index: 1000;
-  background: rgba(255,255,255,0.95); padding: 14px 16px;
-  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+  padding: 14px 16px; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
   font-size: 13px; min-width: 240px; display: none;
 }
-#info h3 { font-size: 15px; margin-bottom: 6px; }
+#info h3 { font-size: 15px; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.3px; }
 #info .detail { margin: 3px 0; }
 #info .detail strong { display: inline-block; min-width: 60px; }
 
 #title-bar {
   position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  z-index: 1000; background: rgba(255,255,255,0.95); padding: 10px 20px;
-  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 1000; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+  padding: 10px 20px; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
   text-align: center;
 }
-#title-bar h1 { font-size: 16px; font-weight: 700; }
-#title-bar p { font-size: 12px; color: #666; margin-top: 2px; }
+#title-bar h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+#title-bar p { font-size: 11px; color: #888; margin-top: 2px; }
 
 #loading {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -63,35 +71,46 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   z-index: 1000; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
 }
 .filter-btn {
-  padding: 5px 12px; border-radius: 20px; border: 2px solid #ccc;
-  background: white; cursor: pointer; font-size: 12px; font-weight: 500;
-  transition: all 0.2s;
+  padding: 5px 12px; border-radius: 20px; border: 1.5px solid rgba(0,0,0,0.15);
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+  cursor: pointer; font-size: 11px; font-weight: 500;
+  transition: all 0.2s; color: #555;
 }
-.filter-btn:hover { border-color: #999; }
-.filter-btn.active { border-color: #333; background: #333; color: white; }
+.filter-btn:hover { border-color: #999; color: #333; }
+.filter-btn.active {
+  border-color: #333; background: #333; color: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
 
+/* --- Pill-style mode toggle --- */
 #mode-toggle {
-  position: absolute; top: 70px; left: 10px; z-index: 1000;
-  display: flex; border-radius: 8px; overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  position: absolute; top: 70px; left: 10px; z-index: 1001;
+  display: flex; border-radius: 25px; overflow: hidden;
+  background: rgba(30,30,50,0.75); backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
 }
 .mode-btn {
   padding: 8px 16px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 600;
-  background: rgba(255,255,255,0.95); color: #333;
-  transition: all 0.2s;
+  font-size: 12px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,0.7);
+  transition: all 0.2s; border-bottom: 2px solid transparent;
 }
-.mode-btn:first-child { border-right: 1px solid #ddd; }
-.mode-btn.active { background: #333; color: white; }
+.mode-btn:hover { color: rgba(255,255,255,0.95); }
+.mode-btn.active { color: white; }
+.mode-btn.active[data-mode="politique"] { border-bottom-color: #4a90d9; }
+.mode-btn.active[data-mode="surveillance"] { border-bottom-color: #e8913a; }
+.mode-btn.active[data-mode="prospection"] { border-bottom-color: #4ecdc4; }
 
 #stats-panel {
   position: absolute; top: 10px; right: 10px; z-index: 1000;
-  background: rgba(255,255,255,0.95); padding: 16px;
-  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+  padding: 16px; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
   font-size: 13px; width: 320px; max-height: calc(100vh - 30px);
   overflow-y: auto; display: none;
 }
-#stats-panel h3 { font-size: 14px; margin-bottom: 10px; }
+#stats-panel h3 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
 #stats-panel table {
   width: 100%; border-collapse: collapse; font-size: 12px;
 }
@@ -100,20 +119,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 }
 #stats-panel th { font-weight: 600; color: #666; font-size: 11px; }
 #stats-panel tr.clickable { cursor: pointer; }
-#stats-panel tr.clickable:hover { background: #f5f5f5; }
+#stats-panel tr.clickable:hover { background: rgba(0,0,0,0.03); }
 #stats-panel .stats-note {
   margin-top: 12px; font-size: 10px; color: #999; line-height: 1.4;
 }
 #stats-panel .stats-summary {
-  margin: 10px 0; padding: 8px; background: #f8f8f8;
-  border-radius: 4px; font-size: 12px; line-height: 1.5;
+  margin: 10px 0; padding: 8px; background: rgba(0,0,0,0.03);
+  border-radius: 6px; font-size: 12px; line-height: 1.5;
 }
 
 #surv-filters {
   position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-  z-index: 1000; display: none; background: rgba(255,255,255,0.95);
-  padding: 10px 16px; border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 1000; display: none; background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px); padding: 10px 16px; border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
   font-size: 12px; gap: 12px; align-items: center;
   flex-wrap: wrap; justify-content: center;
 }
@@ -121,7 +140,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 #surv-filters input[type="range"] { width: 100px; }
 #surv-filters .slider-value { min-width: 30px; font-weight: 600; }
 
+/* --- Data freshness year indicators --- */
+.data-year { font-size: 10px; color: #aaa; font-style: italic; margin-left: 4px; }
+
+/* --- Mode-specific overrides --- */
 .surv-mode #info { top: auto; bottom: 30px; }
+.prosp-mode #info { top: auto; bottom: 30px; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  #stats-panel { top: auto; bottom: 0; right: 0; left: 0; width: 100%; max-height: 40vh; border-radius: 10px 10px 0 0; }
+  #info { top: auto; bottom: 0; right: 0; left: 0; width: 100%; min-width: unset; border-radius: 10px 10px 0 0; }
+  #filter-bar { max-width: 95vw; }
+  #surv-filters { flex-direction: column; align-items: flex-start; }
+  #mode-toggle { left: 5px; }
+  #legend { max-width: 200px; font-size: 11px; }
+}
 </style>
 </head>
 <body>
@@ -138,8 +172,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 </div>
 
 <div id="mode-toggle">
-  <button class="mode-btn active" data-mode="politique">Vue politique</button>
-  <button class="mode-btn" data-mode="surveillance">Vue surveillance</button>
+  <button class="mode-btn active" data-mode="politique">Politique</button>
+  <button class="mode-btn" data-mode="surveillance">Surveillance</button>
+  <button class="mode-btn" data-mode="prospection">Prospection</button>
 </div>
 
 <div id="filter-bar"></div>
@@ -202,6 +237,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     <div><strong>Ratio /10k :</strong> <span id="info-ratio"></span></div>
     <div><strong>Videoprot. :</strong> <span id="info-vs"></span></div>
   </div>
+  <div class="detail" id="info-prosp-row" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+  </div>
 </div>
 
 <div id="stats-panel">
@@ -237,6 +274,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   status.textContent = 'Telechargement des donnees surveillance...';
   var survResp = await fetch('surveillance.json');
   var surv = await survResp.json();
+
+  status.textContent = 'Telechargement des donnees prospection...';
+  var prospResp = await fetch('prospection.json');
+  var prosp = await prospResp.json();
 
   status.textContent = 'Telechargement des contours (12 Mo)...';
   var topoResp = await fetch('communes-topo.json');
@@ -409,9 +450,121 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     };
   }
 
+  // --- Prospection scoring engine ---
+  var PROSP_SIGNALS = [
+    { key: 'stat_payant',  label: 'Stationnement payant',     weight: 25, year: '2018' },
+    { key: 'no_videoverb', label: 'Sans videoverbalisation',  weight: 25, year: '2025' },
+    { key: 'pm_count',     label: 'Effectif police mun.',     weight: 15, year: '2024' },
+    { key: 'pm_growth',    label: 'Croissance PM',            weight: 10, year: '2019-2024' },
+    { key: 'has_vs',       label: 'Videoprotection',          weight: 5,  year: '2012' },
+    { key: 'pop_sweet',    label: 'Taille commune',           weight: 20, year: '2021' }
+  ];
+
+  var prospWeights = {};
+  PROSP_SIGNALS.forEach(function(s) { prospWeights[s.key] = s.weight; });
+
+  var prospFilters = { statPayantOnly: false, noVideoverb: false, hasVs: false, popMin: 0, popMax: 500000 };
+
+  function computeProspScore(code) {
+    var p = prosp[code];
+    if (!p) return null;
+    var pop = p.pop || 0;
+
+    var signals = {};
+    // Stationnement payant (binary)
+    signals.stat_payant = p.stat_payant ? 1 : 0;
+    // No videoverbalisation (inverted — higher if NOT equipped)
+    signals.no_videoverb = p.videoverb ? 0 : 1;
+    // PM count normalized per capita (cap at 50/10k)
+    var pmCount = (p.pm || 0) + (p.asvp || 0);
+    signals.pm_count = pop > 0 ? Math.min(pmCount / pop * 10000 / 50, 1) : 0;
+    // PM growth (% change over trend, capped 0-1)
+    if (p.pm_trend && p.pm_trend.length >= 2) {
+      var first = p.pm_trend[0];
+      var last = p.pm_trend[p.pm_trend.length - 1];
+      if (first > 0) {
+        signals.pm_growth = Math.min(Math.max((last - first) / first, 0), 1);
+      } else {
+        signals.pm_growth = last > 0 ? 1 : 0;
+      }
+    } else {
+      signals.pm_growth = 0;
+    }
+    // Has videoprotection (binary)
+    signals.has_vs = p.vs ? 1 : 0;
+    // Population sweet spot (Gaussian around 5k-100k, center 30k)
+    if (pop > 0) {
+      var logPop = Math.log(pop);
+      var logCenter = Math.log(30000);
+      var sigma = 1.2;
+      signals.pop_sweet = Math.exp(-0.5 * Math.pow((logPop - logCenter) / sigma, 2));
+    } else {
+      signals.pop_sweet = 0;
+    }
+
+    // Weighted sum
+    var totalWeight = 0;
+    var weightedSum = 0;
+    for (var key in signals) {
+      var w = prospWeights[key] || 0;
+      totalWeight += w;
+      weightedSum += signals[key] * w;
+    }
+    if (totalWeight === 0) return null;
+    return Math.round(weightedSum / totalWeight * 100);
+  }
+
+  function passesProspFilters(code) {
+    var p = prosp[code];
+    if (!p) return false;
+    if (prospFilters.statPayantOnly && !p.stat_payant) return false;
+    if (prospFilters.noVideoverb && p.videoverb) return false;
+    if (prospFilters.hasVs && !p.vs) return false;
+    var pop = p.pop || 0;
+    if (pop < prospFilters.popMin || pop > prospFilters.popMax) return false;
+    return true;
+  }
+
+  var PROSP_COLORS = [
+    { threshold: 0,  color: '#2c3e50' },
+    { threshold: 20, color: '#3498db' },
+    { threshold: 40, color: '#f39c12' },
+    { threshold: 60, color: '#e67e22' },
+    { threshold: 80, color: '#e74c3c' }
+  ];
+
+  function getProspColor(score) {
+    for (var i = PROSP_COLORS.length - 1; i >= 0; i--) {
+      if (score >= PROSP_COLORS[i].threshold) return PROSP_COLORS[i].color;
+    }
+    return PROSP_COLORS[0].color;
+  }
+
+  // Style function — prospection mode
+  function getStyleProspection(feature) {
+    var code = feature.properties.codgeo;
+    var p = prosp[code];
+    if (!p) return { fillColor: '#333', fillOpacity: 0.08, weight: 0.2, color: '#222', opacity: 0.3 };
+
+    if (!passesProspFilters(code))
+      return { fillColor: '#444', fillOpacity: 0.1, weight: 0.2, color: '#222', opacity: 0.3 };
+
+    var score = computeProspScore(code);
+    if (score === null) return { fillColor: '#555', fillOpacity: 0.15, weight: 0.2, color: '#333', opacity: 0.3 };
+
+    return {
+      fillColor: getProspColor(score),
+      fillOpacity: 0.8,
+      weight: 0.3,
+      color: '#222',
+      opacity: 0.5
+    };
+  }
+
   // Style dispatcher
   function getStyle(feature) {
     if (currentMode === 'surveillance') return getStyleSurveillance(feature);
+    if (currentMode === 'prospection') return getStyleProspection(feature);
     return getStylePolitique(feature);
   }
 
@@ -422,22 +575,70 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     var m = maires[code];
     if (!m) return;
     document.getElementById('info-name').textContent = m.n + ' (' + code + ')';
-    document.getElementById('info-maire').textContent = m.m || '—';
+    document.getElementById('info-maire').textContent = m.m || '\u2014';
     document.getElementById('info-nuance').textContent = m.lb + ' (' + m.nu + ')';
     document.getElementById('info-famille').textContent = m.f;
     infoPanel.style.display = 'block';
 
     var s = surv[code];
     var survRow = document.getElementById('info-surv-row');
-    if (s) {
-      survRow.style.display = 'block';
-      document.getElementById('info-pm').textContent = (s.pm || 0) + ' agents';
-      document.getElementById('info-asvp').textContent = (s.asvp || 0) + ' agents';
-      document.getElementById('info-pop').textContent = s.pop ? s.pop.toLocaleString('fr') + ' hab.' : 'N/A';
-      document.getElementById('info-ratio').textContent = s.r ? s.r + ' agents/10k hab' : 'N/A';
-      document.getElementById('info-vs').textContent = s.vs ? 'Oui (2012)' : 'Non repertoriee';
-    } else {
+    var prospRow = document.getElementById('info-prosp-row');
+
+    if (currentMode === 'prospection') {
       survRow.style.display = 'none';
+      var p = prosp[code];
+      prospRow.style.display = 'block';
+      prospRow.textContent = '';
+
+      var score = computeProspScore(code);
+      var lines = [];
+      if (score !== null) {
+        lines.push(['Score', score + '/100', '']);
+      } else {
+        lines.push(['Score', 'N/A', '']);
+      }
+      if (p) {
+        if (p.pop) lines.push(['Population', p.pop.toLocaleString('fr') + ' hab.', p.pop_year || '']);
+        var pmTotal = (p.pm || 0) + (p.asvp || 0);
+        if (pmTotal > 0) lines.push(['Police mun.', pmTotal + ' agents', '2024']);
+        if (p.pm_trend && p.pm_trend.length >= 2) {
+          var first = p.pm_trend[0], last = p.pm_trend[p.pm_trend.length - 1];
+          var pct = first > 0 ? Math.round((last - first) / first * 100) : (last > 0 ? 100 : 0);
+          var sign = pct >= 0 ? '+' : '';
+          var yRange = p.pm_trend_years[0] + '-' + p.pm_trend_years[p.pm_trend_years.length - 1];
+          lines.push(['Evol. PM', sign + pct + '%', yRange]);
+        }
+        lines.push(['Stat. payant', p.stat_payant ? 'Oui' : 'Non', p.stat_payant_year || '2018']);
+        lines.push(['Videoverb.', p.videoverb ? 'Oui' : 'Non', p.videoverb_year || '2025']);
+        lines.push(['Videoprot.', p.vs ? 'Oui' : 'Non', p.vs_year || '']);
+      }
+
+      lines.forEach(function(line) {
+        var div = document.createElement('div');
+        var strong = document.createElement('strong');
+        strong.textContent = line[0] + ' : ';
+        div.appendChild(strong);
+        div.appendChild(document.createTextNode(line[1]));
+        if (line[2]) {
+          var yr = document.createElement('span');
+          yr.className = 'data-year';
+          yr.textContent = '(' + line[2] + ')';
+          div.appendChild(yr);
+        }
+        prospRow.appendChild(div);
+      });
+    } else {
+      prospRow.style.display = 'none';
+      if (s) {
+        survRow.style.display = 'block';
+        document.getElementById('info-pm').textContent = (s.pm || 0) + ' agents';
+        document.getElementById('info-asvp').textContent = (s.asvp || 0) + ' agents';
+        document.getElementById('info-pop').textContent = s.pop ? s.pop.toLocaleString('fr') + ' hab.' : 'N/A';
+        document.getElementById('info-ratio').textContent = s.r ? s.r + ' agents/10k hab' : 'N/A';
+        document.getElementById('info-vs').textContent = s.vs ? 'Oui (2012)' : 'Non repertoriee';
+      } else {
+        survRow.style.display = 'none';
+      }
     }
   }
 
@@ -494,18 +695,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     document.getElementById('filter-bar').style.display = mode === 'politique' ? 'flex' : 'none';
     document.getElementById('surv-filters').style.display = mode === 'surveillance' ? 'flex' : 'none';
-    document.getElementById('stats-panel').style.display = mode === 'surveillance' ? 'block' : 'none';
+    document.getElementById('stats-panel').style.display = (mode === 'surveillance' || mode === 'prospection') ? 'block' : 'none';
     document.getElementById('info').style.display = 'none';
     document.body.classList.toggle('surv-mode', mode === 'surveillance');
+    document.body.classList.toggle('prosp-mode', mode === 'prospection');
 
-    document.querySelector('#title-bar p').textContent =
-      mode === 'surveillance'
-        ? 'Effectifs police municipale et videoprotection'
-        : 'Nuance politique du maire \u2014 Municipales 2020';
+    var subtitles = {
+      politique: 'Nuance politique du maire \u2014 Municipales 2020',
+      surveillance: 'Effectifs police municipale et videoprotection',
+      prospection: 'Potentiel videoverbalisation par commune'
+    };
+    document.querySelector('#title-bar p').textContent = subtitles[mode];
 
     renderLegend(mode);
     geoLayer.setStyle(getStyle);
     if (mode === 'surveillance') renderStats();
+    if (mode === 'prospection') renderProspStats();
   }
 
   function renderLegend(mode) {
@@ -545,6 +750,52 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
       legendSurvEl.style.display = 'block';
       legendTitle.textContent = 'Famille politique';
+      return;
+    }
+
+    if (mode === 'prospection') {
+      // Prospection mode legend
+      legendSurvEl.style.display = 'none';
+      legendTitle.textContent = 'Score prospection';
+      legendItemsEl.textContent = '';
+
+      var labels = ['< 20 (faible)', '20-40', '40-60', '60-80', '80+ (tres fort)'];
+      PROSP_COLORS.forEach(function(pc, idx) {
+        var item = document.createElement('div');
+        item.className = 'legend-item';
+        item.style.cursor = 'default';
+
+        var swatch = document.createElement('div');
+        swatch.className = 'legend-swatch';
+        swatch.style.background = pc.color;
+
+        var label = document.createElement('span');
+        label.className = 'legend-label';
+        label.textContent = labels[idx];
+
+        item.appendChild(swatch);
+        item.appendChild(label);
+        legendItemsEl.appendChild(item);
+      });
+
+      var greyItem = document.createElement('div');
+      greyItem.className = 'legend-item';
+      greyItem.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid #ddd;cursor:default;';
+      var greyBox = document.createElement('div');
+      greyBox.className = 'legend-swatch';
+      greyBox.style.background = '#555';
+      greyBox.style.opacity = '0.4';
+      var greyLabel = document.createElement('span');
+      greyLabel.className = 'legend-label';
+      greyLabel.textContent = 'Pas de donnees';
+      greyItem.appendChild(greyBox);
+      greyItem.appendChild(greyLabel);
+      legendItemsEl.appendChild(greyItem);
+
+      var noteDiv = document.createElement('div');
+      noteDiv.style.cssText = 'margin-top:8px;font-size:10px;color:#999;line-height:1.4;';
+      noteDiv.textContent = 'Score composite \u2014 ajustez les poids dans le panneau lateral';
+      legendItemsEl.appendChild(noteDiv);
       return;
     }
 
@@ -632,6 +883,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
   function renderStats() {
     var stats = computeStats();
+    document.querySelector('#stats-panel h3').textContent = 'Surveillance par famille politique';
     var tableEl = document.getElementById('stats-table');
     var summaryEl = document.getElementById('stats-summary');
     var noteEl = document.getElementById('stats-note');
@@ -720,6 +972,202 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     noteEl.textContent = 'Base sur ' + totalCommunes + ' communes avec donnees surveillance et nuance politique attribuee. ' +
       'Les communes "Non classe" (92% du total) sont exclues. Sources : police mun. 2024, videoprot. 2012, pop. INSEE.';
+  }
+
+  // --- Prospection stats & sliders ---
+  function renderProspStats() {
+    var panel = document.getElementById('stats-panel');
+    var tableEl = document.getElementById('stats-table');
+    var summaryEl = document.getElementById('stats-summary');
+    var noteEl = document.getElementById('stats-note');
+    document.querySelector('#stats-panel h3').textContent = 'Prospection';
+
+    tableEl.textContent = '';
+
+    // Weight sliders section
+    var slidersDiv = document.createElement('div');
+    slidersDiv.style.cssText = 'margin-bottom:12px;';
+    var slidersTitle = document.createElement('div');
+    slidersTitle.style.cssText = 'font-size:11px;font-weight:700;color:#666;margin-bottom:6px;';
+    slidersTitle.textContent = 'Poids des signaux';
+    slidersDiv.appendChild(slidersTitle);
+
+    PROSP_SIGNALS.forEach(function(sig) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:4px 0;font-size:11px;';
+
+      var label = document.createElement('span');
+      label.style.cssText = 'flex:1;min-width:0;';
+      label.textContent = sig.label;
+      var yearSpan = document.createElement('span');
+      yearSpan.className = 'data-year';
+      yearSpan.textContent = '(' + sig.year + ')';
+      label.appendChild(yearSpan);
+
+      var slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.value = String(prospWeights[sig.key]);
+      slider.style.cssText = 'width:70px;';
+
+      var valSpan = document.createElement('span');
+      valSpan.style.cssText = 'min-width:24px;text-align:right;font-weight:600;font-size:10px;';
+      valSpan.textContent = prospWeights[sig.key];
+
+      slider.addEventListener('input', (function(key, vs) {
+        return function() {
+          prospWeights[key] = parseInt(this.value);
+          vs.textContent = this.value;
+          geoLayer.setStyle(getStyle);
+          updateProspSummary();
+        };
+      })(sig.key, valSpan));
+
+      row.appendChild(label);
+      row.appendChild(slider);
+      row.appendChild(valSpan);
+      slidersDiv.appendChild(row);
+    });
+    tableEl.appendChild(slidersDiv);
+
+    // Filters section
+    var filtersDiv = document.createElement('div');
+    filtersDiv.style.cssText = 'margin:10px 0;padding:8px;background:rgba(0,0,0,0.03);border-radius:6px;font-size:11px;';
+    var filtersTitle = document.createElement('div');
+    filtersTitle.style.cssText = 'font-weight:700;color:#666;margin-bottom:6px;';
+    filtersTitle.textContent = 'Filtres';
+    filtersDiv.appendChild(filtersTitle);
+
+    var filterDefs = [
+      { key: 'statPayantOnly', label: 'Stat. payant uniquement' },
+      { key: 'noVideoverb', label: 'Sans videoverbalisation' },
+      { key: 'hasVs', label: 'Avec videoprotection' }
+    ];
+
+    filterDefs.forEach(function(fd) {
+      var lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;margin:3px 0;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = prospFilters[fd.key];
+      cb.addEventListener('change', (function(key) {
+        return function() {
+          prospFilters[key] = this.checked;
+          geoLayer.setStyle(getStyle);
+          updateProspSummary();
+        };
+      })(fd.key));
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(fd.label));
+      filtersDiv.appendChild(lbl);
+    });
+
+    // Population range
+    var popRow = document.createElement('div');
+    popRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;';
+    popRow.appendChild(document.createTextNode('Pop. min :'));
+    var popMinSlider = document.createElement('input');
+    popMinSlider.type = 'range'; popMinSlider.min = '0'; popMinSlider.max = '100000';
+    popMinSlider.value = String(prospFilters.popMin); popMinSlider.step = '1000';
+    popMinSlider.style.cssText = 'width:80px;';
+    var popMinVal = document.createElement('span');
+    popMinVal.style.cssText = 'min-width:40px;font-weight:600;font-size:10px;';
+    popMinVal.textContent = prospFilters.popMin.toLocaleString('fr');
+    popMinSlider.addEventListener('input', function() {
+      prospFilters.popMin = parseInt(this.value);
+      popMinVal.textContent = prospFilters.popMin.toLocaleString('fr');
+      geoLayer.setStyle(getStyle);
+      updateProspSummary();
+    });
+    popRow.appendChild(popMinSlider);
+    popRow.appendChild(popMinVal);
+    filtersDiv.appendChild(popRow);
+
+    tableEl.appendChild(filtersDiv);
+
+    // Stats table: per-famille breakdown
+    var statsDiv = document.createElement('div');
+    statsDiv.id = 'prosp-stats-breakdown';
+    tableEl.appendChild(statsDiv);
+
+    updateProspSummary();
+
+    noteEl.textContent = 'Sources : police mun. 2019-2024 (Min. Interieur), stat. payant 2018 (GART/Cerema), ' +
+      'videoverbalisation 2025 (video-verbalisation.fr), videoprot. 2012 (CNIL), pop. INSEE 2021.';
+  }
+
+  function updateProspSummary() {
+    var summaryEl = document.getElementById('stats-summary');
+    var statsDiv = document.getElementById('prosp-stats-breakdown');
+    if (!statsDiv) return;
+
+    // Compute per-famille stats
+    var famStats = {};
+    FAMILLES.forEach(function(f) {
+      if (f.key === 'Non class\u00e9') return;
+      famStats[f.key] = { label: f.label, color: f.color, count: 0, totalScore: 0, scored: 0 };
+    });
+
+    var totalScored = 0;
+    var hotProspects = 0;
+
+    for (var code in prosp) {
+      if (!passesProspFilters(code)) continue;
+      var score = computeProspScore(code);
+      var m = maires[code];
+      var fam = m ? famStats[m.f] : null;
+
+      if (score !== null) {
+        totalScored++;
+        if (fam) { fam.count++; fam.totalScore += score; fam.scored++; }
+        var p = prosp[code];
+        if (p.stat_payant && !p.videoverb) hotProspects++;
+      }
+    }
+
+    // Build table
+    statsDiv.textContent = '';
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    ['Famille', 'Communes', 'Score moy.'].forEach(function(t) {
+      var th = document.createElement('th'); th.textContent = t; hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    FAMILLES.forEach(function(f) {
+      if (f.key === 'Non class\u00e9') return;
+      var s = famStats[f.key];
+      if (!s || s.count === 0) return;
+      var tr = document.createElement('tr');
+      var tdF = document.createElement('td');
+      var sw = document.createElement('span');
+      sw.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:2px;background:' + f.color + ';margin-right:4px;vertical-align:middle;';
+      tdF.appendChild(sw);
+      tdF.appendChild(document.createTextNode(f.label));
+      var tdC = document.createElement('td'); tdC.textContent = s.count;
+      var tdS = document.createElement('td');
+      tdS.textContent = s.scored > 0 ? (s.totalScore / s.scored).toFixed(0) : '-';
+      tr.appendChild(tdF); tr.appendChild(tdC); tr.appendChild(tdS);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    statsDiv.appendChild(table);
+
+    // Summary
+    summaryEl.textContent = '';
+    var line1 = document.createElement('div');
+    line1.textContent = totalScored + ' communes scorees';
+    summaryEl.appendChild(line1);
+    var line2 = document.createElement('div');
+    var strong = document.createElement('strong');
+    strong.textContent = hotProspects;
+    line2.appendChild(strong);
+    line2.appendChild(document.createTextNode(' avec stat. payant sans videoverbalisation'));
+    summaryEl.appendChild(line2);
   }
 
   // Hide loading
