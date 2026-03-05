@@ -150,6 +150,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 #stats-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 #stats-panel::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
+#stats-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+#stats-header h3 { margin-bottom: 0; }
+#stats-collapse {
+  background: none; border: none; color: #999; font-size: 20px;
+  cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  transition: all 0.2s;
+}
+#stats-collapse:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+#stats-tab {
+  position: absolute; top: 10px; right: 0; z-index: 1000;
+  background: rgba(15,15,30,0.82); backdrop-filter: blur(16px);
+  border-radius: 10px 0 0 10px; padding: 10px 12px;
+  cursor: pointer; color: #e0e0e0; font-size: 14px;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.08); border-right: none;
+  transition: all 0.2s;
+}
+#stats-tab:hover { background: rgba(25,25,50,0.9); }
+#stats-tab-badge {
+  display: inline-block; background: #4ecdc4; color: #000;
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  border-radius: 10px; margin-left: 6px;
+}
+
+#stats-scroll-fade {
+  position: sticky; bottom: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(transparent, rgba(15,15,30,0.82));
+  pointer-events: none; margin-top: -24px;
+}
+
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
   height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none;
@@ -251,10 +285,20 @@ input[type="range"]::-moz-range-thumb {
 </div>
 
 <div id="stats-panel">
-  <h3>Surveillance par famille politique</h3>
-  <div id="stats-table"></div>
-  <div id="stats-summary" class="stats-summary"></div>
-  <div class="stats-note" id="stats-note"></div>
+  <div id="stats-header">
+    <h3>Surveillance par famille politique</h3>
+    <button id="stats-collapse" title="Replier">&rsaquo;</button>
+  </div>
+  <div id="stats-body">
+    <div id="stats-table"></div>
+    <div id="stats-summary" class="stats-summary"></div>
+    <div class="stats-note" id="stats-note"></div>
+  </div>
+  <div id="stats-scroll-fade"></div>
+</div>
+<div id="stats-tab" style="display:none;">
+  <span id="stats-tab-icon">&#9776;</span>
+  <span id="stats-tab-badge"></span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -807,6 +851,24 @@ input[type="range"]::-moz-range-thumb {
   }
   updateModeIndicator();
 
+  var statsPanel = document.getElementById('stats-panel');
+  var statsTab = document.getElementById('stats-tab');
+  var statsCollapse = document.getElementById('stats-collapse');
+  var statsBadge = document.getElementById('stats-tab-badge');
+  var statsPanelCollapsed = false;
+
+  statsCollapse.addEventListener('click', function() {
+    statsPanelCollapsed = true;
+    statsPanel.style.display = 'none';
+    statsTab.style.display = 'block';
+  });
+
+  statsTab.addEventListener('click', function() {
+    statsPanelCollapsed = false;
+    statsTab.style.display = 'none';
+    statsPanel.style.display = 'block';
+  });
+
   function switchMode(mode) {
     currentMode = mode;
     var btns = document.querySelectorAll('.mode-btn');
@@ -816,7 +878,17 @@ input[type="range"]::-moz-range-thumb {
 
     document.getElementById('filter-bar').style.display = mode === 'politique' ? 'flex' : 'none';
     document.getElementById('surv-filters').style.display = mode === 'surveillance' ? 'flex' : 'none';
-    document.getElementById('stats-panel').style.display = (mode === 'surveillance' || mode === 'prospection') ? 'block' : 'none';
+    var showStats = (mode === 'surveillance' || mode === 'prospection');
+    if (showStats && statsPanelCollapsed) {
+      statsPanel.style.display = 'none';
+      statsTab.style.display = 'block';
+    } else if (showStats) {
+      statsPanel.style.display = 'block';
+      statsTab.style.display = 'none';
+    } else {
+      statsPanel.style.display = 'none';
+      statsTab.style.display = 'none';
+    }
     document.getElementById('info').style.display = 'none';
     document.body.classList.toggle('surv-mode', mode === 'surveillance');
     document.body.classList.toggle('prosp-mode', mode === 'prospection');
@@ -1094,6 +1166,8 @@ input[type="range"]::-moz-range-thumb {
 
     noteEl.textContent = 'Base sur ' + totalCommunes + ' communes avec donnees surveillance et nuance politique attribuee. ' +
       'Les communes "Non classe" (92% du total) sont exclues. Sources : police mun. 2024, videoprot. 2012, pop. INSEE.';
+
+    if (statsBadge) statsBadge.textContent = totalCommunes;
   }
 
   // --- Prospection stats & sliders ---
@@ -1297,6 +1371,8 @@ input[type="range"]::-moz-range-thumb {
         if (p.stat_payant && !p.videoverb) hotProspects++;
       }
     }
+
+    if (statsBadge) statsBadge.textContent = totalScored;
 
     // Build table
     statsDiv.textContent = '';
