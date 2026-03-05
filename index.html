@@ -12,10 +12,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
 /* --- Glassmorphism card base --- */
 #legend, #info, #title-bar, #stats-panel, #surv-filters {
-  background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+  background: rgba(15,15,30,0.82); backdrop-filter: blur(16px);
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08);
   transition: opacity 0.3s ease, transform 0.3s ease;
+  color: #e0e0e0;
 }
 
 #legend {
@@ -23,41 +24,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   padding: 14px 16px;
   font-size: 13px; max-width: 280px;
 }
-#legend h3 { margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+#legend h3 { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #e0e0e0; }
 .legend-item { display: flex; align-items: center; margin: 4px 0; cursor: pointer; padding: 2px 4px; }
-.legend-item:hover { background: rgba(0,0,0,0.05); border-radius: 4px; }
+.legend-item:hover { background: rgba(255,255,255,0.06); border-radius: 4px; }
 .legend-swatch {
   width: 16px; height: 16px; border-radius: 3px;
   margin-right: 8px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.2);
 }
-.legend-label { font-size: 11px; color: #444; }
-.legend-count { font-size: 10px; color: #999; margin-left: auto; padding-left: 8px; }
+.legend-label { font-size: 11px; color: #ccc; }
+.legend-count { font-size: 10px; color: #777; margin-left: auto; padding-left: 8px; }
 
 #info {
   position: fixed; z-index: 1100;
   padding: 14px 16px; pointer-events: none;
   font-size: 13px; min-width: 240px; max-width: 320px; display: none;
 }
-#info h3 { font-size: 15px; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.3px; }
+#info h3 { font-size: 15px; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
 #info .detail { margin: 3px 0; }
-#info .detail strong { display: inline-block; min-width: 60px; }
+#info .detail strong { display: inline-block; min-width: 60px; color: #999; }
 
 #title-bar {
   position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
   z-index: 1000; padding: 10px 20px; text-align: center;
 }
-#title-bar h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-#title-bar p { font-size: 11px; color: #888; margin-top: 2px; }
+#title-bar h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
+#title-bar p { font-size: 11px; color: #999; margin-top: 2px; }
 
 #loading {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  z-index: 2000; background: rgba(255,255,255,0.95); padding: 30px 40px;
-  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  text-align: center; font-size: 16px;
+  z-index: 2000; background: rgba(15,15,30,0.95); padding: 30px 40px;
+  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  text-align: center; font-size: 16px; color: #e0e0e0;
 }
 #loading .spinner {
-  width: 40px; height: 40px; border: 4px solid #ddd;
-  border-top-color: #0066CC; border-radius: 50%;
+  width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
+  border-top-color: #4a90d9; border-radius: 50%;
   animation: spin 0.8s linear infinite; margin: 0 auto 15px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -67,15 +68,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   z-index: 1000; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
 }
 .filter-btn {
-  padding: 5px 12px; border-radius: 20px; border: 1.5px solid rgba(0,0,0,0.15);
-  background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
-  cursor: pointer; font-size: 11px; font-weight: 500;
-  transition: all 0.2s; color: #555;
+  padding: 6px 14px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(15,15,30,0.7); backdrop-filter: blur(8px);
+  cursor: pointer; font-size: 12px; font-weight: 500;
+  transition: all 0.2s; color: #ccc;
 }
-.filter-btn:hover { border-color: #999; color: #333; }
+.filter-btn:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
 .filter-btn.active {
-  border-color: #333; background: #333; color: white;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  border-color: #4a90d9; background: #4a90d9; color: white;
+  box-shadow: 0 2px 12px rgba(74,144,217,0.3);
 }
 
 /* --- Pill-style mode toggle --- */
@@ -104,21 +105,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   font-size: 14px; width: 380px; max-height: calc(100vh - 30px);
   overflow-y: auto; display: none;
 }
-#stats-panel h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+#stats-panel h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #e0e0e0; }
 #stats-panel table {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 #stats-panel th, #stats-panel td {
-  padding: 6px 8px; text-align: left; border-bottom: 1px solid #eee;
+  padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-#stats-panel th { font-weight: 600; color: #666; font-size: 12px; }
+#stats-panel th { font-weight: 600; color: #999; font-size: 12px; }
 #stats-panel tr.clickable { cursor: pointer; }
-#stats-panel tr.clickable:hover { background: rgba(0,0,0,0.03); }
+#stats-panel tr.clickable:hover { background: rgba(255,255,255,0.04); }
 #stats-panel .stats-note {
-  margin-top: 12px; font-size: 12px; color: #777; line-height: 1.5;
+  margin-top: 12px; font-size: 12px; color: #888; line-height: 1.5;
 }
 #stats-panel .stats-summary {
-  margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.03);
+  margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.04);
   border-radius: 6px; font-size: 13px; line-height: 1.5;
 }
 
@@ -127,13 +128,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   z-index: 1000; display: none; padding: 10px 16px;
   font-size: 12px; gap: 12px; align-items: center;
   flex-wrap: wrap; justify-content: center;
+  color: #ccc;
 }
 #surv-filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 #surv-filters input[type="range"] { width: 100px; }
 #surv-filters .slider-value { min-width: 30px; font-weight: 600; }
 
 /* --- Data freshness year indicators --- */
-.data-year { font-size: 11px; color: #aaa; font-style: italic; margin-left: 4px; }
+.data-year { font-size: 11px; color: #777; font-style: italic; margin-left: 4px; }
 
 /* --- Mode-specific overrides --- */
 
@@ -145,6 +147,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   #mode-toggle { left: 5px; }
   #legend { max-width: 200px; font-size: 11px; }
 }
+
+#stats-panel::-webkit-scrollbar { width: 6px; }
+#stats-panel::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+#stats-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+#stats-panel::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #4ecdc4; cursor: pointer;
+  box-shadow: 0 0 6px rgba(78,205,196,0.4);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; border: none;
+  background: #4ecdc4; cursor: pointer;
+  box-shadow: 0 0 6px rgba(78,205,196,0.4);
+}
 </style>
 </head>
 <body>
@@ -152,7 +175,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 <div id="loading">
   <div class="spinner"></div>
   <div>Chargement des 35 000 communes...</div>
-  <div id="load-status" style="font-size:12px;color:#666;margin-top:8px;"></div>
+  <div id="load-status" style="font-size:12px;color:#888;margin-top:8px;"></div>
 </div>
 
 <div id="title-bar">
@@ -189,25 +212,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 <div id="legend">
   <h3>Famille politique</h3>
   <div id="legend-items"></div>
-  <div id="legend-surv" style="margin-top:12px; padding-top:10px; border-top:1px solid #ddd;">
-    <h3 style="font-size:13px; margin-bottom:8px;">Surveillance</h3>
+  <div id="legend-surv" style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);">
+    <h3 style="font-size:13px; margin-bottom:8px; color:#ccc;">Surveillance</h3>
 
     <div style="display:flex; align-items:center; margin:6px 0;">
       <svg width="80" height="16" style="margin-right:8px;">
-        <line x1="2" y1="8" x2="18" y2="8" stroke="#888" stroke-width="0.5"/>
-        <line x1="22" y1="8" x2="38" y2="8" stroke="#888" stroke-width="1.5"/>
-        <line x1="42" y1="8" x2="58" y2="8" stroke="#888" stroke-width="3"/>
-        <line x1="62" y1="8" x2="78" y2="8" stroke="#888" stroke-width="4"/>
+        <line x1="2" y1="8" x2="18" y2="8" stroke="#aaa" stroke-width="0.5"/>
+        <line x1="22" y1="8" x2="38" y2="8" stroke="#aaa" stroke-width="1.5"/>
+        <line x1="42" y1="8" x2="58" y2="8" stroke="#aaa" stroke-width="3"/>
+        <line x1="62" y1="8" x2="78" y2="8" stroke="#aaa" stroke-width="4"/>
       </svg>
       <span class="legend-label">Effectif police mun.</span>
     </div>
 
     <div style="display:flex; align-items:center; margin:6px 0;">
-      <div style="width:16px; height:16px; border:3px solid white; border-radius:3px; background:#666; margin-right:8px; box-shadow:0 0 2px rgba(0,0,0,0.5);"></div>
+      <div style="width:16px; height:16px; border:3px solid rgba(255,255,255,0.7); border-radius:3px; background:#666; margin-right:8px; box-shadow:0 0 2px rgba(0,0,0,0.5);"></div>
       <span class="legend-label">Videoprotection</span>
     </div>
 
-    <div style="margin-top:8px; font-size:10px; color:#999; line-height:1.4;">
+    <div style="margin-top:8px; font-size:10px; color:#777; line-height:1.4;">
       Police mun. : donnees 2024<br>
       Videoprotection : donnees 2012
     </div>
@@ -219,14 +242,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   <div class="detail" id="info-maire-row"><strong>Maire :</strong> <span id="info-maire"></span></div>
   <div class="detail"><strong>Nuance :</strong> <span id="info-nuance"></span></div>
   <div class="detail"><strong>Famille :</strong> <span id="info-famille"></span></div>
-  <div class="detail" id="info-surv-row" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+  <div class="detail" id="info-surv-row" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);">
     <div><strong>Police mun. :</strong> <span id="info-pm"></span></div>
     <div><strong>ASVP :</strong> <span id="info-asvp"></span></div>
     <div><strong>Population :</strong> <span id="info-pop"></span></div>
     <div><strong>Ratio /10k :</strong> <span id="info-ratio"></span></div>
     <div><strong>Videoprot. :</strong> <span id="info-vs"></span></div>
   </div>
-  <div class="detail" id="info-prosp-row" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+  <div class="detail" id="info-prosp-row" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);">
   </div>
 </div>
 
@@ -677,7 +700,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       // Score decomposition
       if (result && result.detail) {
         var decompDiv = document.createElement('div');
-        decompDiv.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid #eee;font-size:10px;';
+        decompDiv.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);font-size:10px;';
         var decompTitle = document.createElement('div');
         decompTitle.style.cssText = 'font-weight:700;color:#888;margin-bottom:3px;';
         decompTitle.textContent = 'Decomposition du score :';
@@ -689,18 +712,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
           row.style.cssText = 'display:flex;align-items:center;gap:4px;margin:2px 0;';
 
           var barBg = document.createElement('div');
-          barBg.style.cssText = 'width:40px;height:6px;background:#eee;border-radius:3px;overflow:hidden;flex-shrink:0;';
+          barBg.style.cssText = 'width:40px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;flex-shrink:0;';
           var barFill = document.createElement('div');
           var pct = Math.round(d.raw * 100);
           barFill.style.cssText = 'height:100%;border-radius:3px;background:' + (pct > 60 ? '#2ecc71' : pct > 30 ? '#f39c12' : '#e74c3c') + ';width:' + pct + '%;';
           barBg.appendChild(barFill);
 
           var labelEl = document.createElement('span');
-          labelEl.style.cssText = 'color:#666;flex:1;';
+          labelEl.style.cssText = 'color:#aaa;flex:1;';
           labelEl.textContent = d.label;
 
           var contribEl = document.createElement('span');
-          contribEl.style.cssText = 'font-weight:600;color:#444;min-width:20px;text-align:right;';
+          contribEl.style.cssText = 'font-weight:600;color:#ccc;min-width:20px;text-align:right;';
           contribEl.textContent = '+' + d.contrib;
 
           row.appendChild(barBg);
@@ -869,7 +892,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
       var greyItem = document.createElement('div');
       greyItem.className = 'legend-item';
-      greyItem.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid #ddd;cursor:default;';
+      greyItem.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08);cursor:default;';
       var greyBox = document.createElement('div');
       greyBox.className = 'legend-swatch';
       greyBox.style.background = '#555';
@@ -882,7 +905,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       legendItemsEl.appendChild(greyItem);
 
       var noteDiv = document.createElement('div');
-      noteDiv.style.cssText = 'margin-top:8px;font-size:10px;color:#999;line-height:1.4;';
+      noteDiv.style.cssText = 'margin-top:8px;font-size:10px;color:#777;line-height:1.4;';
       noteDiv.textContent = 'Score composite \u2014 ajustez les poids dans le panneau lateral';
       legendItemsEl.appendChild(noteDiv);
       return;
@@ -915,9 +938,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     var vsItem = document.createElement('div');
     vsItem.className = 'legend-item';
-    vsItem.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid #ddd;cursor:default;';
+    vsItem.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);cursor:default;';
     var vsBox = document.createElement('div');
-    vsBox.style.cssText = 'width:16px;height:16px;border:3px solid white;border-radius:3px;background:#666;margin-right:8px;box-shadow:0 0 2px rgba(0,0,0,0.5);';
+    vsBox.style.cssText = 'width:16px;height:16px;border:3px solid rgba(255,255,255,0.7);border-radius:3px;background:#666;margin-right:8px;box-shadow:0 0 2px rgba(0,0,0,0.5);';
     var vsLabel = document.createElement('span');
     vsLabel.className = 'legend-label';
     vsLabel.textContent = 'Videoprotection';
@@ -1075,7 +1098,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     // Intro explanation
     var introDiv = document.createElement('div');
-    introDiv.style.cssText = 'font-size:13px;color:#444;line-height:1.6;margin-bottom:14px;padding:10px 12px;background:rgba(46,204,113,0.08);border-radius:6px;border-left:3px solid #2ecc71;';
+    introDiv.style.cssText = 'font-size:13px;color:#ccc;line-height:1.6;margin-bottom:14px;padding:10px 12px;background:rgba(78,205,196,0.08);border-radius:6px;border-left:3px solid #4ecdc4;';
     introDiv.textContent = 'Chaque commune recoit un score de 0 a 100 estimant son potentiel ' +
       'pour la videoverbalisation. Le score combine 6 signaux issus de donnees publiques. ' +
       'Ajustez les curseurs pour modifier l\'importance de chaque critere — la carte se met a jour en temps reel.';
@@ -1085,7 +1108,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     var slidersDiv = document.createElement('div');
     slidersDiv.style.cssText = 'margin-bottom:12px;';
     var slidersTitle = document.createElement('div');
-    slidersTitle.style.cssText = 'font-size:13px;font-weight:700;color:#555;margin-bottom:8px;';
+    slidersTitle.style.cssText = 'font-size:13px;font-weight:700;color:#999;margin-bottom:8px;';
     slidersTitle.textContent = 'Poids des signaux';
     slidersDiv.appendChild(slidersTitle);
 
@@ -1130,16 +1153,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
       // Signal description — short + expandable detail
       var descEl = document.createElement('div');
-      descEl.style.cssText = 'font-size:11px;color:#888;margin-top:2px;padding-left:2px;line-height:1.4;';
+      descEl.style.cssText = 'font-size:11px;color:#777;margin-top:2px;padding-left:2px;line-height:1.4;';
       descEl.textContent = sig.desc;
       wrapper.appendChild(descEl);
 
       if (sig.detail) {
         var toggle = document.createElement('span');
-        toggle.style.cssText = 'font-size:11px;color:#3498db;cursor:pointer;margin-left:4px;user-select:none;';
+        toggle.style.cssText = 'font-size:11px;color:#4ecdc4;cursor:pointer;margin-left:4px;user-select:none;';
         toggle.textContent = ' [detail]';
         var detailEl = document.createElement('div');
-        detailEl.style.cssText = 'font-size:11px;color:#666;margin-top:4px;padding:6px 8px;background:rgba(0,0,0,0.03);border-radius:4px;line-height:1.5;display:none;';
+        detailEl.style.cssText = 'font-size:11px;color:#aaa;margin-top:4px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:4px;line-height:1.5;display:none;';
         detailEl.textContent = sig.detail;
         toggle.addEventListener('click', function() {
           var shown = detailEl.style.display !== 'none';
@@ -1156,9 +1179,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     // Filters section
     var filtersDiv = document.createElement('div');
-    filtersDiv.style.cssText = 'margin:12px 0;padding:10px;background:rgba(0,0,0,0.03);border-radius:6px;font-size:13px;';
+    filtersDiv.style.cssText = 'margin:12px 0;padding:10px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:13px;';
     var filtersTitle = document.createElement('div');
-    filtersTitle.style.cssText = 'font-weight:700;color:#555;margin-bottom:8px;font-size:13px;';
+    filtersTitle.style.cssText = 'font-weight:700;color:#999;margin-bottom:8px;font-size:13px;';
     filtersTitle.textContent = 'Filtres';
     filtersDiv.appendChild(filtersTitle);
 
