@@ -2386,9 +2386,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     h3('Donnees absentes');
     var ul = document.createElement('ul');
     [
-      'Budgets communaux securite (codes SIREN, pas de decoupage "securite" exploitable)',
       'Police intercommunale (mutualisations depuis 2019, non prises en compte)',
-      'Radars et PV automatises (pas de dataset national open data)'
+      'Radars et PV automatises (pas de dataset national open data)',
+      'Budget "securite" detaille (DGFiP integre mais sans decoupage fonctionnel securite)'
     ].forEach(function(text) {
       var li = document.createElement('li');
       li.textContent = text;

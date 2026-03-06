@@ -6,13 +6,16 @@ Ce document decrit l'ensemble des donnees utilisees par la carte, leurs sources,
 
 ## Vue d'ensemble
 
-La carte couvre **34 844 communes** de France metropolitaine et d'outre-mer. Elle propose trois modes de visualisation :
+La carte couvre **34 844 communes** de France metropolitaine et d'outre-mer. Elle propose quatre modes de visualisation :
 
 | Mode | Ce qu'il montre | Donnees utilisees |
 |------|----------------|-------------------|
 | **Politique** | Couleur politique du maire (municipales 2020) | `maires.json` |
 | **Surveillance** | Densite de police municipale (agents / 10k hab.) | `surveillance.json` |
+| **Securite** | Taux de delinquance enregistree / 10k hab. | `delinquance.json` |
 | **Prospection** | Score composite de potentiel pour la videoverbalisation | `prospection.json` |
+
+Les **fiches communes** (clic sur une commune) affichent toutes les donnees disponibles quel que soit le mode actif : politique, surveillance, delinquance, finances, revenus, QPV. Chaque donnee est accompagnee d'un **badge de fraicheur** colore indiquant l'annee de la source.
 
 ---
 
@@ -113,7 +116,7 @@ Resultat : 4 167 communes matchees sur ~4 576 lignes (91%). Les 409 non matchees
 
 ## 3. Donnees de prospection — `prospection.json`
 
-Le mode prospection calcule un **score de 0 a 100** estimant le potentiel d'une commune pour la videoverbalisation. Ce score est la moyenne ponderee de 5 signaux, chacun normalise entre 0 et 1.
+Le mode prospection calcule un **score de 0 a 100** estimant le potentiel d'une commune pour la videoverbalisation. Ce score est la moyenne ponderee de 6 signaux, chacun normalise entre 0 et 1.
 
 ### Sources de donnees
 
@@ -125,6 +128,7 @@ Le mode prospection calcule un **score de 0 a 100** estimant le potentiel d'une 
 | Accidents routiers | ONISR (BAAC) | 2023-2024 | 16 064 | [data.gouv.fr](https://static.data.gouv.fr/resources/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024/20251021-115900/caract-2024.csv) |
 | Population | INSEE | 2021 | 4 145 | via surveillance.json |
 | PM courant | Min. Interieur | 2024 | 4 164 | via surveillance.json |
+| DGF par habitant | DGFiP | 2022 | ~35 000 | via enrichment.json |
 
 ### Contenu par commune
 
@@ -144,9 +148,134 @@ Le mode prospection calcule un **score de 0 a 100** estimant le potentiel d'une 
 
 ---
 
-## 4. Score de prospection — formule complete
+## 4. Donnees de delinquance — `delinquance.json`
 
-### Les 5 signaux
+### Source
+
+- **Dataset** : Bases statistiques communales de la delinquance enregistree par la police et la gendarmerie nationales
+- **Editeur** : Service statistique ministeriel de la securite interieure (SSMSI), Ministere de l'Interieur
+- **Format** : fichier Parquet (~14 MB)
+- **Annee des donnees** : 2024 (derniere annee disponible dans le fichier)
+- **URL** : [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/bases-statistiques-communale-departementale-et-regionale-de-la-delinquance-enregistree-par-la-police-et-la-gendarmerie-nationales/)
+
+### Categories de delits
+
+Le dataset contient 15 categories, chacune associee a une unite de comptage privilegiee pour eviter les doublons (un meme fait peut etre compte en "infractions" et en "victimes") :
+
+| Categorie | Cle courte | Unite retenue |
+|-----------|-----------|---------------|
+| Cambriolages de logement | `cambr` | Infraction |
+| Destructions et degradations volontaires | `destr` | Infraction |
+| Escroqueries et fraudes aux moyens de paiement | `escro` | Infraction |
+| Trafic de stupefiants | `traf_stup` | Infraction |
+| Usage de stupefiants | `usage_stup` | Mis en cause |
+| Usage de stupefiants (AFD) | `usage_stup_afd` | Mis en cause |
+| Violences physiques hors cadre familial | `viol_phys` | Victime |
+| Violences physiques intrafamiliales | `viol_intraf` | Victime |
+| Violences sexuelles | `viol_sex` | Victime |
+| Vols avec armes | `vols_armes` | Victime |
+| Vols d'accessoires sur vehicules | `vols_acc_veh` | Infraction |
+| Vols dans les vehicules | `vols_ds_veh` | Infraction |
+| Vols de vehicule | `vols_veh` | Vehicule |
+| Vols sans violence contre des personnes | `vols_sv` | Victime |
+| Vols violents sans arme | `vols_viol` | Victime |
+
+### Contenu par commune
+
+| Champ | Description | Exemple |
+|-------|-------------|---------|
+| `total` | Nombre total de faits toutes categories | 259 403 |
+| `cats` | Objet avec une cle par categorie | `{"cambr": 12889, "vols_sv": 91234, ...}` |
+| `pop` | Population de la commune | 2 114 461 |
+| `r` | Ratio total / 10 000 habitants | 1227.2 |
+| `year` | Annee des donnees | "2024" |
+
+### Calcul du ratio
+
+```
+ratio = total / population * 10 000
+```
+
+Le ratio n'est **pas plafonne** (contrairement au mode surveillance) car la distribution est plus homogene.
+
+En mode securite, le ratio peut etre calcule **par categorie** (filtrage par pills) :
+
+```
+ratio_categorie = cats[categorie] / population * 10 000
+```
+
+### Couverture et seuil de diffusion
+
+- **~9 400 communes** sur 34 844 ont des donnees (27%)
+- Le SSMSI applique un **seuil de diffusion** : les communes en dessous d'un certain seuil de population (environ 2 000 habitants) voient leurs donnees masquees (`nombre = NaN` dans le fichier source). Ce masquage vise a proteger l'anonymat des victimes dans les petites communes
+- Seules les lignes avec un nombre diffuse sont retenues dans `delinquance.json`
+- Les communes sans donnees apparaissent en gris transparent en mode securite
+
+### Jointure
+
+Le fichier parquet contient directement un **code INSEE a 5 chiffres** (colonne `CODGEO_2025`, geographie 2025). La jointure est directe, sans ambiguite.
+
+### Limites
+
+- **Seuil de diffusion** : les petites communes n'ont pas de donnees, ce qui biaise les analyses geographiques (les zones rurales sont absentes)
+- **Faits enregistres ≠ faits commis** : seuls les faits portes a la connaissance de la police/gendarmerie sont comptabilises. Le "chiffre noir" (faits non declares) varie fortement selon les categories (ex: violences intrafamiliales sous-declarees)
+- **Population permanente** : comme pour la surveillance, le ratio est rapporte a la population legale, pas a la population reelle (tourisme, navetteurs)
+- **Paris, Lyon, Marseille** : ces communes utilisent un code commune global (75056, 69123, 13055) qui agrege tous les arrondissements
+
+---
+
+## 5. Donnees d'enrichissement — `enrichment.json`
+
+Donnees socio-economiques et de politique de la ville utilisees pour enrichir les fiches communes et le scoring prospection.
+
+### Sources
+
+| Donnee | Source | Annee | Format | Communes | URL |
+|--------|--------|-------|--------|----------|-----|
+| QPV (Quartiers Prioritaires) | ANCT | 2024 | CSV | 843 | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/) |
+| Comptes individuels communes | DGFiP (Min. Economie) | 2022 | JSON | ~35 000 | [data.economie.gouv.fr](https://data.economie.gouv.fr/explore/dataset/comptes-individuels-des-communes-fichier-global-2022/) |
+| Revenus medians | Filosofi / INSEE | 2013 | XLSX | ~33 000 | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/revenus-des-francais-a-la-commune/) |
+
+### Contenu par commune
+
+| Champ | Description | Source | Exemple |
+|-------|-------------|--------|---------|
+| `qpv` | Nombre de Quartiers Prioritaires dans la commune | ANCT 2024 | 3 |
+| `dgf_hab` | Dotation Globale de Fonctionnement par habitant (EUR) | DGFiP 2022 | 104.5 |
+| `dette_hab` | Dette par habitant (EUR) | DGFiP 2022 | 666.7 |
+| `cafn_hab` | Capacite d'autofinancement nette par habitant (EUR) | DGFiP 2022 | -17.3 |
+| `perso_hab` | Charges de personnel par habitant (EUR) | DGFiP 2022 | 452.2 |
+| `rev_med` | Revenu median par unite de consommation (EUR) | Filosofi 2013 | 19 554 |
+| `tx_pauv` | Taux de pauvrete (%) | Filosofi 2013 | 15.2 |
+
+### QPV — Quartiers Prioritaires de la Politique de la Ville
+
+Le fichier QPV de l'ANCT liste chaque quartier prioritaire avec son code INSEE de commune. Le script compte le nombre de QPV par commune. **843 communes** sont concernees par au moins un QPV.
+
+Dans l'interface :
+- **Fiche commune** : badge "QPV" avec le nombre de quartiers
+- **Mode prospection** : filtre "Communes avec QPV uniquement"
+
+### DGFiP — Comptes individuels des communes
+
+Les comptes individuels du Ministere de l'Economie (DGFiP) fournissent les indicateurs financiers par habitant. Le fichier source utilise un code departement (3 caracteres) + code commune (3 caracteres) qui sont concatenes pour reconstituer le code INSEE a 5 chiffres.
+
+### Revenus — Filosofi 2013
+
+Les revenus medians proviennent du dispositif Filosofi de l'INSEE. **Attention** : les donnees datent de **2013** (12-13 ans), ce qui constitue la source la plus ancienne du projet. Le taux de pauvrete n'est pas disponible dans le fichier utilise (colonne absente).
+
+### Integration dans la fiche commune
+
+La fiche commune affiche une section "Contexte socio-economique" avec :
+- Revenu median (badge fraicheur orange — 2013)
+- DGF, dette, CAF nette, charges de personnel par habitant (badges fraicheur jaune — 2022)
+- Badge QPV (si applicable)
+
+---
+
+## 6. Score de prospection — formule complete
+
+### Les 6 signaux
 
 Chaque signal est une valeur entre 0 et 1. Le score final est la moyenne ponderee de ces signaux, ramenee sur 100.
 
@@ -260,11 +389,29 @@ C'est une **courbe gaussienne en echelle logarithmique**, centree sur 30 000 hab
 
 ---
 
+#### Signal 6 : Capacite budgetaire (poids par defaut : 0%)
+
+```
+signal = min(dgf_hab / 500, 1)
+```
+
+**Source** : DGF par habitant (DGFiP 2022), via `enrichment.json`.
+
+**Logique** : une commune avec une dotation globale de fonctionnement elevee par habitant dispose de marges budgetaires plus importantes pour investir dans des equipements de videoverbalisation.
+
+**Normalisation** : le montant DGF/hab est divise par 500 EUR et plafonne a 1. Une commune recevant 250 EUR/hab obtient un signal de 0,5.
+
+**Poids par defaut : 0%** — ce signal est desactive par defaut pour ne pas modifier le scoring existant. L'utilisateur peut l'activer via le slider dans l'interface.
+
+**Couverture** : ~35 000 communes (quasi-exhaustif grace aux comptes DGFiP).
+
+---
+
 ### Calcul du score final
 
 ```
-score = arrondi( (signal_1 * poids_1 + signal_2 * poids_2 + ... + signal_5 * poids_5)
-                 / (poids_1 + poids_2 + ... + poids_5) * 100 )
+score = arrondi( (signal_1 * poids_1 + signal_2 * poids_2 + ... + signal_6 * poids_6)
+                 / (poids_1 + poids_2 + ... + poids_6) * 100 )
 ```
 
 Avec les poids par defaut (modifiables via les sliders dans l'interface) :
@@ -276,6 +423,7 @@ Avec les poids par defaut (modifiables via les sliders dans l'interface) :
 | Effectif PM | 20 | 20% |
 | Accidents routiers | 15 | 15% |
 | Croissance PM | 10 | 10% |
+| Capacite budgetaire | 0 | 0% (activable) |
 
 L'utilisateur peut ajuster ces poids via l'interface. Le score est recalcule en temps reel.
 
@@ -298,23 +446,50 @@ La majorite des communes (79%) ont un score < 10. C'est normal : seules les comm
 
 ---
 
-## 5. Filtres de prospection
+## 7. Filtres de prospection
 
-En plus du score, trois filtres binaires sont disponibles :
+En plus du score, quatre filtres binaires sont disponibles :
 
 | Filtre | Effet |
 |--------|-------|
 | **Stat. payant uniquement** | Ne montre que les 226 communes avec stationnement payant |
 | **Sans videoverbalisation** | Exclut les 586 communes deja equipees en videoverbalisation |
 | **Population min.** | Slider pour fixer un seuil de population minimum |
+| **Communes avec QPV** | Ne montre que les 843 communes ayant au moins un Quartier Prioritaire |
 
 Le filtre "Sans videoverbalisation" merite une explication : plutot que d'inclure ce critere dans le score (ce qui gonflait artificiellement 90% des communes puisque la majorite n'ont pas de videoverbalisation), il est traite comme un **filtre d'exclusion**. Les communes deja equipees sont simplement masquees.
+
+Le filtre QPV permet de cibler les communes beneficiant de la politique de la ville, qui peuvent avoir des besoins specifiques en matiere de securisation et des financements dedies.
 
 **Source videoverbalisation** : liste scrappee depuis [video-verbalisation.fr/villes.php](https://video-verbalisation.fr/villes.php) (534 villes listees, 586 codes INSEE matches apres resolution des homonymes). Le scraping extrait les noms de villes depuis les liens HTML et les matche par nom normalise.
 
 ---
 
-## 6. Jointure et matching des donnees
+## 8. Mode securite — fonctionnement
+
+Le mode securite affiche une **heatmap** du ratio de delinquance pour 10 000 habitants. L'echelle de couleur utilise 6 niveaux (palette violet/magenta) :
+
+| Seuil (ratio /10k) | Couleur |
+|---------------------|---------|
+| 0 | Violet tres fonce |
+| ... | Degradation progressive |
+| Maximum observe | Magenta clair |
+
+### Filtrage par categorie
+
+Des "pills" de categories (comme les familles politiques en mode politique) permettent de filtrer par type de delit. Par defaut, le ratio total est affiche. Un clic sur une categorie recalcule la heatmap avec le ratio de cette seule categorie.
+
+### Croisement par famille politique
+
+Un tableau dans la barre laterale affiche le **ratio moyen de delinquance par famille politique**, permettant de croiser les donnees de securite avec les etiquettes politiques des maires.
+
+### Barre d'information
+
+La barre inferieure affiche : nombre de communes avec donnees | ratio moyen | categorie active.
+
+---
+
+## 9. Jointure et matching des donnees
 
 Plusieurs sources de donnees n'utilisent pas le code INSEE mais un **nom de commune + departement**. La jointure repose sur une normalisation des noms :
 
@@ -337,9 +512,11 @@ Ce matching est imparfait. Les communes non matchees sont principalement :
 - Police municipale : 91% (4 167 / ~4 576)
 - Videoverbalisation : 99,3% (586 / 590 matchables)
 
+Les sources plus recentes (delinquance, QPV, DGFiP) utilisent directement le code INSEE, ce qui elimine les problemes de matching.
+
 ---
 
-## 7. Limites connues et pistes d'amelioration
+## 10. Limites connues et pistes d'amelioration
 
 ### Donnees incompletes
 
@@ -348,13 +525,14 @@ Ce matching est imparfait. Les communes non matchees sont principalement :
 | Nuances politiques | 7,7% des communes | Seules les communes > 1 000 hab. ont une nuance officielle |
 | Stationnement payant | 226 communes | L'enquete GART 2019 est loin d'etre exhaustive (~800+ communes en realite) |
 | Surveillance | 12% des communes | Les communes sans PM ni ASVP sont absentes |
+| Delinquance | ~27% des communes | Seuil de diffusion SSMSI masque les petites communes |
+| Taux de pauvrete | 0 communes | Colonne absente dans le fichier Filosofi 2013 utilise |
 
 ### Donnees absentes qui seraient pertinentes
 
-- **Budgets communaux securite** : les balances comptables des communes sont en open data (data.economie.gouv.fr, 2024) mais utilisent des codes SIREN et des comptes comptables sans decoupage fonctionnel "securite" exploitable
-- **Statistiques de delinquance par commune** : pas de dataset national open data identifie a la maille communale
 - **Police intercommunale** : depuis 2019, des communes mutualisent leur police au niveau intercommunal — non pris en compte
 - **Radars et PV automatises** : pas de dataset national open data identifie a la maille communale
+- **Budget "securite" detaille** : les comptes DGFiP sont integres (DGF, dette, etc.) mais sans decoupage fonctionnel "securite" exploitable
 
 ### Biais connus du scoring
 
@@ -362,6 +540,13 @@ Ce matching est imparfait. Les communes non matchees sont principalement :
 2. **Sous-representation du stationnement payant** : avec seulement 226 communes, le signal pese peu dans le score reel malgre son poids theorique de 30%. La contribution moyenne est de 0,4 points sur 100
 3. **Ratio PM plafonne** : le plafonnement a 50 agents/10k ecrase les differences entre communes tres dotees (Saint-Tropez, stations balneaires)
 4. **Accidents corporels uniquement** : exclut les accidents materiels et les infractions routieres sans accident, qui seraient pourtant pertinents
+
+### Biais connus des donnees d'enrichissement
+
+5. **Delinquance — seuil de diffusion** : les donnees sont masquees pour les petites communes, ce qui sur-represente les communes urbaines et moyennes dans les analyses
+6. **Delinquance — chiffre noir** : les faits enregistres ne representent qu'une fraction des faits reels, avec un taux de declaration tres variable selon le type de delit
+7. **Revenus obsoletes** : les donnees Filosofi datent de 2013 (12-13 ans). L'evolution des revenus depuis peut etre significative, notamment dans les zones en gentrification ou en declin
+8. **Paris/Lyon/Marseille** : les revenus et certaines donnees sont absents car ces communes utilisent des codes d'arrondissements incompatibles avec le code commune global
 
 ### Fraicheur des donnees
 
@@ -374,12 +559,18 @@ Ce matching est imparfait. Les communes non matchees sont principalement :
 | Videoverbalisation | 2025 | < 1 an |
 | Accidents | 2023-2024 | 1-2 ans |
 | Nuances politiques | 2020 | 5-6 ans |
+| Delinquance | 2024 | 1-2 ans |
+| QPV | 2024 | 1-2 ans |
+| Comptes communes (DGFiP) | 2022 | 3-4 ans |
+| Revenus medians (Filosofi) | 2013 | 12-13 ans |
 
-Les prochaines municipales (2026) rendront les nuances politiques obsoletes. Le stationnement payant est la donnee la plus agee.
+Les prochaines municipales (2026) rendront les nuances politiques obsoletes. Les revenus Filosofi 2013 sont la donnee la plus ancienne du projet.
+
+L'interface affiche des **badges de fraicheur** colores pour chaque source : vert (< 2 ans), jaune (2-5 ans), orange (> 5 ans).
 
 ---
 
-## 8. Reproduction
+## 11. Reproduction
 
 Tous les scripts de generation sont dans le depot :
 
@@ -392,8 +583,14 @@ python3 process_surveillance.py
 
 # Regenerer les donnees de prospection (telecharge tout depuis data.gouv.fr + scraping)
 python3 process_prospection.py
+
+# Regenerer les donnees de delinquance (telecharge le parquet depuis data.gouv.fr, ~14 MB)
+python3 process_delinquance.py
+
+# Regenerer les donnees d'enrichissement (QPV, DGFiP, Filosofi — telecharge tout)
+python3 process_enrichment.py
 ```
 
-Dependances Python : `pandas`, `openpyxl`, `odf`
+Dependances Python : `pandas`, `openpyxl`, `odf`, `pyarrow`
 
 Les URLs des sources sont en dur dans les scripts. Si une URL change (mise a jour du dataset sur data.gouv.fr), le script echouera et l'URL devra etre mise a jour manuellement.
