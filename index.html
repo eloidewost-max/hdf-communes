@@ -579,10 +579,268 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     infoPanel.style.display = 'block';
   }
 
-  // --- Detail panel placeholder ---
+  // --- Detail panel ---
   function openDetail(code) {
-    console.log('openDetail:', code);
-    // Will be implemented in Task 6
+    var panel = document.getElementById('detail-panel');
+    var content = document.getElementById('detail-content');
+    content.textContent = '';
+
+    var m = maires[code];
+    var s = surv[code];
+    var p = prosp[code];
+
+    // Header section
+    var headerSec = document.createElement('div');
+    headerSec.className = 'detail-section';
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'detail-header-name';
+    nameEl.textContent = (m ? m.n : (p ? code : code)) + ' (' + code + ')';
+    headerSec.appendChild(nameEl);
+
+    var popVal = p ? p.pop : (s ? s.pop : 0);
+    if (popVal) {
+      var popEl = document.createElement('div');
+      popEl.className = 'detail-header-sub';
+      popEl.textContent = popVal.toLocaleString('fr') + ' hab.';
+      headerSec.appendChild(popEl);
+    }
+
+    if (m && m.f) {
+      var badgeEl = document.createElement('span');
+      badgeEl.className = 'detail-badge';
+      badgeEl.style.background = m.cl || '#444';
+      badgeEl.style.color = '#fff';
+      badgeEl.textContent = m.f;
+      var badgeWrap = document.createElement('div');
+      badgeWrap.style.marginTop = '6px';
+      badgeWrap.appendChild(badgeEl);
+      headerSec.appendChild(badgeWrap);
+    }
+
+    if (m && m.m) {
+      var maireEl = document.createElement('div');
+      maireEl.className = 'detail-header-sub';
+      maireEl.style.marginTop = '4px';
+      maireEl.textContent = 'Maire : ' + m.m + ' \u2014 ' + (m.lb || '') + ' (' + (m.nu || '') + ')';
+      headerSec.appendChild(maireEl);
+    }
+
+    content.appendChild(headerSec);
+
+    // Score section
+    if (p) {
+      var scoreSec = document.createElement('div');
+      scoreSec.className = 'detail-section';
+
+      var scoreResult = computeProspScore(code, true);
+      if (scoreResult && scoreResult.score !== null) {
+        var scoreColor = getThresholdColor(scoreResult.score, PROSP_COLORS);
+        var scoreBig = document.createElement('span');
+        scoreBig.className = 'detail-score-big';
+        scoreBig.style.color = scoreColor;
+        scoreBig.textContent = scoreResult.score + '/100';
+
+        // Compute rank
+        var higherCount = 0;
+        var totalCount = 0;
+        for (var c in prosp) {
+          if (passesProspFilters(c)) {
+            var sc = computeProspScore(c);
+            if (sc !== null) {
+              totalCount++;
+              if (sc > scoreResult.score) higherCount++;
+            }
+          }
+        }
+        var rankPct = totalCount > 0 ? Math.round(higherCount / totalCount * 100) : 0;
+        var rankEl = document.createElement('span');
+        rankEl.className = 'detail-rank';
+        rankEl.textContent = 'Top ' + Math.max(rankPct, 1) + '%';
+
+        var scoreRow = document.createElement('div');
+        scoreRow.appendChild(scoreBig);
+        scoreRow.appendChild(rankEl);
+        scoreSec.appendChild(scoreRow);
+
+        // Signal decomposition
+        if (scoreResult.detail) {
+          scoreResult.detail.forEach(function(sig) {
+            var row = document.createElement('div');
+            row.className = 'detail-signal-row';
+
+            var barBg = document.createElement('div');
+            barBg.className = 'detail-signal-bar-bg';
+            var barFill = document.createElement('div');
+            barFill.className = 'detail-signal-bar-fill';
+            barFill.style.width = Math.round(sig.raw * 100) + '%';
+            barFill.style.background = sig.raw > 0.6 ? '#4ecdc4' : (sig.raw > 0.3 ? '#f39c12' : '#e74c3c');
+            barBg.appendChild(barFill);
+            row.appendChild(barBg);
+
+            var labelEl = document.createElement('span');
+            labelEl.className = 'detail-signal-label';
+            labelEl.textContent = sig.label;
+            row.appendChild(labelEl);
+
+            var valEl = document.createElement('span');
+            valEl.className = 'detail-signal-value';
+            valEl.textContent = '+' + sig.contrib;
+            row.appendChild(valEl);
+
+            // Find signal year
+            var sigDef = null;
+            PROSP_SIGNALS.forEach(function(sd) { if (sd.key === sig.key) sigDef = sd; });
+            if (sigDef) {
+              var yearEl = document.createElement('span');
+              yearEl.className = 'detail-signal-year';
+              var yr = parseInt(sigDef.year, 10) || 0;
+              if (yr >= 2023) yearEl.className += ' freshness-green';
+              else if (yr >= 2019) yearEl.className += ' freshness-yellow';
+              else yearEl.className += ' freshness-orange';
+              yearEl.textContent = '(' + sigDef.year + ')';
+              row.appendChild(yearEl);
+            }
+
+            scoreSec.appendChild(row);
+          });
+        }
+
+        // Coverage warning for stat_payant
+        var warnEl = document.createElement('div');
+        warnEl.className = 'detail-warning';
+        warnEl.textContent = 'Couverture partielle : 226 communes sur ~800+ reelles';
+        scoreSec.appendChild(warnEl);
+      }
+
+      content.appendChild(scoreSec);
+    }
+
+    // Surveillance section
+    if (s || p) {
+      var survSec = document.createElement('div');
+      survSec.className = 'detail-section';
+
+      var survTitle = document.createElement('div');
+      survTitle.className = 'cmd-section-title';
+      survTitle.textContent = 'SURVEILLANCE';
+      survSec.appendChild(survTitle);
+
+      var sData = s || {};
+      var pData = p || {};
+
+      var kvData = [
+        { label: 'Police municipale', value: (sData.pm || pData.pm || 0) + ' agents' },
+        { label: 'ASVP', value: (sData.asvp || pData.asvp || 0) + ' agents' }
+      ];
+      var ratioVal = sData.r || 0;
+      var ratioText = ratioVal.toString() + ' /10k';
+      if (sData.r_raw) ratioText += ' (brut: ' + sData.r_raw + ')';
+      kvData.push({ label: 'Ratio /10k', value: ratioText });
+      kvData.push({ label: 'Population', value: (popVal || 0).toLocaleString('fr') });
+
+      kvData.forEach(function(kv) {
+        var row = document.createElement('div');
+        row.className = 'detail-kv';
+        var lbl = document.createElement('span');
+        lbl.className = 'detail-kv-label';
+        lbl.textContent = kv.label;
+        var val = document.createElement('span');
+        val.className = 'detail-kv-value';
+        val.textContent = kv.value;
+        row.appendChild(lbl);
+        row.appendChild(val);
+        survSec.appendChild(row);
+      });
+
+      // PM trend sparkline
+      if (pData.pm_trend && pData.pm_trend.length >= 2) {
+        var sparkWrap = document.createElement('div');
+        sparkWrap.style.marginTop = '8px';
+        var sparkLabel = document.createElement('div');
+        sparkLabel.style.fontSize = '11px';
+        sparkLabel.style.color = '#555';
+        sparkLabel.style.marginBottom = '4px';
+        var years = pData.pm_trend_years || [];
+        sparkLabel.textContent = 'Evolution PM' + (years.length ? ' (' + years[0] + '-' + years[years.length - 1] + ')' : '');
+        sparkWrap.appendChild(sparkLabel);
+
+        var svgNS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', '100');
+        svg.setAttribute('height', '24');
+        svg.style.display = 'block';
+
+        var trend = pData.pm_trend;
+        var maxV = 0;
+        trend.forEach(function(v) { if (v > maxV) maxV = v; });
+        if (maxV === 0) maxV = 1;
+        var pts = [];
+        for (var ti = 0; ti < trend.length; ti++) {
+          var tx = (ti / (trend.length - 1)) * 96 + 2;
+          var ty = 22 - (trend[ti] / maxV) * 20;
+          pts.push(tx.toFixed(1) + ',' + ty.toFixed(1));
+        }
+        var polyline = document.createElementNS(svgNS, 'polyline');
+        polyline.setAttribute('points', pts.join(' '));
+        polyline.setAttribute('fill', 'none');
+        polyline.setAttribute('stroke', '#4ecdc4');
+        polyline.setAttribute('stroke-width', '1.5');
+        svg.appendChild(polyline);
+        sparkWrap.appendChild(svg);
+        survSec.appendChild(sparkWrap);
+      }
+
+      content.appendChild(survSec);
+    }
+
+    // Signals section
+    if (p) {
+      var sigSec = document.createElement('div');
+      sigSec.className = 'detail-section';
+
+      var sigTitle = document.createElement('div');
+      sigTitle.className = 'cmd-section-title';
+      sigTitle.textContent = 'SIGNAUX';
+      sigSec.appendChild(sigTitle);
+
+      var sigKv = [
+        { label: 'Stationnement payant', value: p.stat_payant ? 'Oui' : 'Non' },
+        { label: 'Videoverbalisation', value: p.videoverb ? 'Oui' : 'Non' },
+        { label: 'Accidents', value: (p.accidents || 0).toString() }
+      ];
+
+      sigKv.forEach(function(kv) {
+        var row = document.createElement('div');
+        row.className = 'detail-kv';
+        var lbl = document.createElement('span');
+        lbl.className = 'detail-kv-label';
+        lbl.textContent = kv.label;
+        var val = document.createElement('span');
+        val.className = 'detail-kv-value';
+        val.textContent = kv.value;
+        row.appendChild(lbl);
+        row.appendChild(val);
+        sigSec.appendChild(row);
+      });
+
+      content.appendChild(sigSec);
+    }
+
+    // Missing data section
+    var missSec = document.createElement('div');
+    missSec.className = 'detail-section';
+    var miss1 = document.createElement('div');
+    miss1.className = 'detail-missing';
+    miss1.textContent = 'Budget securite communal : non disponible';
+    missSec.appendChild(miss1);
+    var miss2 = document.createElement('div');
+    miss2.className = 'detail-missing';
+    miss2.textContent = 'Statistiques delinquance : non disponible';
+    missSec.appendChild(miss2);
+    content.appendChild(missSec);
+
+    panel.classList.add('open');
   }
 
   // --- Detail panel close ---
@@ -641,8 +899,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === mode);
     }
 
-    // Clear cmd-content (render functions will be added in Tasks 4-5)
+    // Clear cmd-content
     document.getElementById('cmd-content').textContent = '';
+
+    if (mode === 'prospection') renderCmdProspection();
+    else if (mode === 'politique') renderCmdPolitique();
+    else if (mode === 'surveillance') renderCmdSurveillance();
 
     // Hide info tooltip
     infoPanel.style.display = 'none';
@@ -652,6 +914,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
     // Update mode indicator
     updateModeIndicator();
+    updateBottomBar();
   }
 
   var modeButtons = document.querySelectorAll('.mode-btn');
@@ -659,6 +922,895 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     modeButtons[i].addEventListener('click', (function(btn) {
       return function() { switchMode(btn.getAttribute('data-mode')); };
     })(modeButtons[i]));
+  }
+
+  // --- Compact population format ---
+  function popCompact(n) {
+    if (!n) return '0';
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 10000) return Math.round(n / 1000) + 'k';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return n.toString();
+  }
+
+  // --- renderCmdProspection ---
+  function renderCmdProspection() {
+    var container = document.getElementById('cmd-content');
+
+    // A. Filters section
+    var filterSec = document.createElement('div');
+    filterSec.className = 'cmd-section';
+    var filterTitle = document.createElement('div');
+    filterTitle.className = 'cmd-section-title';
+    filterTitle.textContent = 'FILTRES';
+    filterSec.appendChild(filterTitle);
+
+    // Stat payant checkbox
+    var row1 = document.createElement('div');
+    row1.className = 'filter-row';
+    var lbl1 = document.createElement('label');
+    var cb1 = document.createElement('input');
+    cb1.type = 'checkbox';
+    cb1.checked = prospFilters.statPayantOnly;
+    cb1.addEventListener('change', function() {
+      prospFilters.statPayantOnly = this.checked;
+      invalidateProspCache();
+      geoLayer.setStyle(getStyle);
+      renderProspectList();
+      updateBottomBar();
+    });
+    lbl1.appendChild(cb1);
+    lbl1.appendChild(document.createTextNode(' Stat. payant uniquement'));
+    row1.appendChild(lbl1);
+    filterSec.appendChild(row1);
+
+    // No videoverb checkbox
+    var row2 = document.createElement('div');
+    row2.className = 'filter-row';
+    var lbl2 = document.createElement('label');
+    var cb2 = document.createElement('input');
+    cb2.type = 'checkbox';
+    cb2.checked = prospFilters.noVideoverb;
+    cb2.addEventListener('change', function() {
+      prospFilters.noVideoverb = this.checked;
+      invalidateProspCache();
+      geoLayer.setStyle(getStyle);
+      renderProspectList();
+      updateBottomBar();
+    });
+    lbl2.appendChild(cb2);
+    lbl2.appendChild(document.createTextNode(' Sans videoverbalisation'));
+    row2.appendChild(lbl2);
+    filterSec.appendChild(row2);
+
+    // Pop min slider
+    var row3 = document.createElement('div');
+    row3.className = 'filter-row';
+    var lbl3 = document.createElement('span');
+    lbl3.style.color = '#8b8f98';
+    lbl3.textContent = 'Pop. min :';
+    row3.appendChild(lbl3);
+    var sl3 = document.createElement('input');
+    sl3.type = 'range';
+    sl3.min = '0';
+    sl3.max = '100000';
+    sl3.step = '1000';
+    sl3.value = prospFilters.popMin.toString();
+    var sv3 = document.createElement('span');
+    sv3.className = 'slider-value';
+    sv3.textContent = popCompact(prospFilters.popMin);
+    sl3.addEventListener('input', function() {
+      var v = parseInt(this.value, 10);
+      prospFilters.popMin = v;
+      sv3.textContent = popCompact(v);
+      invalidateProspCache();
+      geoLayer.setStyle(getStyle);
+      renderProspectList();
+      updateBottomBar();
+    });
+    row3.appendChild(sl3);
+    row3.appendChild(sv3);
+    filterSec.appendChild(row3);
+
+    container.appendChild(filterSec);
+
+    // B. Parametres section (collapsible, closed by default)
+    var paramSec = document.createElement('div');
+    paramSec.className = 'cmd-section';
+    var paramTitle = document.createElement('div');
+    paramTitle.className = 'cmd-section-title cmd-section-collapsible';
+    var paramTitleText = document.createTextNode('PARAMETRES ');
+    paramTitle.appendChild(paramTitleText);
+    var chevron = document.createElement('span');
+    chevron.className = 'chevron';
+    chevron.textContent = '\u25B6';
+    paramTitle.appendChild(chevron);
+    var paramBody = document.createElement('div');
+    paramBody.className = 'cmd-section-body collapsed';
+    paramTitle.addEventListener('click', function() {
+      paramBody.classList.toggle('collapsed');
+      paramTitle.classList.toggle('open');
+    });
+    paramSec.appendChild(paramTitle);
+
+    PROSP_SIGNALS.forEach(function(sig) {
+      var row = document.createElement('div');
+      row.className = 'filter-row';
+      var label = document.createElement('span');
+      label.style.color = '#8b8f98';
+      label.style.fontSize = '12px';
+      label.style.minWidth = '120px';
+      label.textContent = sig.label + ' (' + sig.year + ')';
+      row.appendChild(label);
+
+      var slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.value = (prospWeights[sig.key] || 0).toString();
+
+      var valSpan = document.createElement('span');
+      valSpan.className = 'slider-value';
+      valSpan.textContent = (prospWeights[sig.key] || 0).toString();
+
+      slider.addEventListener('input', function() {
+        var v = parseInt(this.value, 10);
+        prospWeights[sig.key] = v;
+        valSpan.textContent = v.toString();
+        scheduleProspRefresh();
+        renderProspectList();
+      });
+
+      row.appendChild(slider);
+      row.appendChild(valSpan);
+      paramBody.appendChild(row);
+    });
+
+    paramSec.appendChild(paramBody);
+    container.appendChild(paramSec);
+
+    // C + D: Histogram and prospect list rendered in a wrapper
+    var listWrap = document.createElement('div');
+    listWrap.id = 'prospect-list-wrap';
+    container.appendChild(listWrap);
+
+    renderProspectList();
+
+    // E. Legend section
+    var legSec = document.createElement('div');
+    legSec.className = 'cmd-section';
+    var legTitle = document.createElement('div');
+    legTitle.className = 'cmd-section-title';
+    legTitle.textContent = 'LEGENDE';
+    legSec.appendChild(legTitle);
+
+    PROSP_COLORS.forEach(function(pc, idx) {
+      var next = PROSP_COLORS[idx + 1];
+      var row = document.createElement('div');
+      row.className = 'legend-row';
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = pc.color;
+      row.appendChild(swatch);
+      var txt = document.createElement('span');
+      txt.textContent = next ? (pc.threshold + ' - ' + (next.threshold - 1)) : (pc.threshold + '+');
+      row.appendChild(txt);
+      legSec.appendChild(row);
+    });
+
+    var noDataRow = document.createElement('div');
+    noDataRow.className = 'legend-row';
+    var noDataSwatch = document.createElement('div');
+    noDataSwatch.className = 'legend-swatch';
+    noDataSwatch.style.background = '#333';
+    noDataSwatch.style.border = '1px dashed #555';
+    noDataRow.appendChild(noDataSwatch);
+    var noDataTxt = document.createElement('span');
+    noDataTxt.textContent = 'Pas de donnees';
+    noDataRow.appendChild(noDataTxt);
+    legSec.appendChild(noDataRow);
+
+    container.appendChild(legSec);
+  }
+
+  // Prospect list rendering (reusable, called on filter/weight change)
+  var prospListLimit = 200;
+
+  function renderProspectList() {
+    var wrap = document.getElementById('prospect-list-wrap');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    // Compute scores for all filtered communes
+    var scored = [];
+    for (var code in prosp) {
+      if (!passesProspFilters(code)) continue;
+      var score = computeProspScore(code);
+      if (score === null) continue;
+      scored.push({ code: code, score: score });
+    }
+    scored.sort(function(a, b) { return b.score - a.score; });
+
+    // C. Histogram
+    var histSec = document.createElement('div');
+    histSec.className = 'cmd-section';
+    var histTitle = document.createElement('div');
+    histTitle.className = 'cmd-section-title';
+    histTitle.textContent = 'DISTRIBUTION';
+    histSec.appendChild(histTitle);
+
+    var buckets = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 0-9, 10-19, ..., 90-100
+    scored.forEach(function(item) {
+      var idx = Math.min(Math.floor(item.score / 10), 9);
+      buckets[idx]++;
+    });
+    var maxBucket = 1;
+    buckets.forEach(function(b) { if (b > maxBucket) maxBucket = b; });
+
+    var histDiv = document.createElement('div');
+    histDiv.className = 'histogram';
+    buckets.forEach(function(count, idx) {
+      var bar = document.createElement('div');
+      bar.className = 'histogram-bar';
+      // Use log scale
+      var h = count > 0 ? (Math.log(count + 1) / Math.log(maxBucket + 1)) * 100 : 0;
+      bar.style.height = Math.max(h, 2) + '%';
+      bar.style.background = getThresholdColor(idx * 10, PROSP_COLORS);
+      bar.title = (idx * 10) + '-' + (idx === 9 ? '100' : (idx * 10 + 9)) + ' : ' + count;
+      histDiv.appendChild(bar);
+    });
+    histSec.appendChild(histDiv);
+
+    var histLabels = document.createElement('div');
+    histLabels.className = 'histogram-labels';
+    var hl0 = document.createElement('span');
+    hl0.textContent = '0';
+    var hl50 = document.createElement('span');
+    hl50.textContent = '50';
+    var hl100 = document.createElement('span');
+    hl100.textContent = '100';
+    histLabels.appendChild(hl0);
+    histLabels.appendChild(hl50);
+    histLabels.appendChild(hl100);
+    histSec.appendChild(histLabels);
+
+    var above50 = 0;
+    scored.forEach(function(item) { if (item.score >= 50) above50++; });
+    var histNote = document.createElement('div');
+    histNote.style.fontSize = '11px';
+    histNote.style.color = '#8b8f98';
+    histNote.style.marginTop = '4px';
+    histNote.textContent = above50 + ' communes > 50/100';
+    histSec.appendChild(histNote);
+
+    wrap.appendChild(histSec);
+
+    // D. Ranked prospect list
+    var listDiv = document.createElement('div');
+    listDiv.className = 'prospect-list';
+
+    var showCount = Math.min(scored.length, prospListLimit);
+    for (var i = 0; i < showCount; i++) {
+      var item = scored[i];
+      var row = document.createElement('div');
+      row.className = 'prospect-row';
+      row.setAttribute('data-code', item.code);
+
+      var nameDiv = document.createElement('div');
+      nameDiv.className = 'prospect-name';
+
+      var dot = document.createElement('span');
+      dot.className = 'prospect-dot';
+      var mc = maires[item.code];
+      dot.style.background = mc ? (mc.cl || '#444') : '#444';
+      nameDiv.appendChild(dot);
+
+      var nameText = document.createTextNode(mc ? mc.n : item.code);
+      nameDiv.appendChild(nameText);
+
+      var meta = document.createElement('span');
+      meta.className = 'prospect-meta';
+      var pData = prosp[item.code];
+      meta.textContent = popCompact(pData ? pData.pop : 0);
+      nameDiv.appendChild(meta);
+
+      row.appendChild(nameDiv);
+
+      var scoreWrap = document.createElement('div');
+      scoreWrap.className = 'prospect-score-wrap';
+
+      var barOuter = document.createElement('div');
+      barOuter.className = 'prospect-bar';
+      var barFill = document.createElement('div');
+      barFill.className = 'prospect-bar-fill';
+      var sColor = getThresholdColor(item.score, PROSP_COLORS);
+      barFill.style.width = item.score + '%';
+      barFill.style.background = sColor;
+      barOuter.appendChild(barFill);
+      scoreWrap.appendChild(barOuter);
+
+      var scoreSpan = document.createElement('span');
+      scoreSpan.className = 'prospect-score';
+      scoreSpan.style.color = sColor;
+      scoreSpan.textContent = item.score.toString();
+      scoreWrap.appendChild(scoreSpan);
+
+      row.appendChild(scoreWrap);
+
+      // Hover: highlight on map
+      (function(c) {
+        row.addEventListener('mouseenter', function() {
+          var layer = layerByCode[c];
+          if (layer) layer.setStyle({ weight: 2, color: '#fff', opacity: 1 });
+        });
+        row.addEventListener('mouseleave', function() {
+          var layer = layerByCode[c];
+          if (layer) geoLayer.resetStyle(layer);
+        });
+        row.addEventListener('click', function() {
+          openDetail(c);
+          var layer = layerByCode[c];
+          if (layer) map.fitBounds(layer.getBounds(), { maxZoom: 13, padding: [50, 50] });
+        });
+      })(item.code);
+
+      listDiv.appendChild(row);
+    }
+
+    wrap.appendChild(listDiv);
+
+    // "Voir les X suivantes" link
+    if (scored.length > prospListLimit) {
+      var moreDiv = document.createElement('div');
+      moreDiv.className = 'prospect-more';
+      moreDiv.textContent = 'Voir les ' + (scored.length - prospListLimit) + ' suivantes';
+      moreDiv.addEventListener('click', function() {
+        prospListLimit = scored.length;
+        renderProspectList();
+      });
+      wrap.appendChild(moreDiv);
+    }
+  }
+
+  // --- renderCmdPolitique ---
+  function renderCmdPolitique() {
+    var container = document.getElementById('cmd-content');
+
+    // Coverage banner
+    var totalWithNuance = 0;
+    var totalCommunes = 0;
+    for (var code in maires) {
+      totalCommunes++;
+      if (maires[code].f !== 'Non class\u00e9') totalWithNuance++;
+    }
+    var banner = document.createElement('div');
+    banner.className = 'cmd-section';
+    var bannerDiv = document.createElement('div');
+    bannerDiv.className = 'coverage-banner';
+    bannerDiv.textContent = totalWithNuance.toLocaleString('fr') + ' / ' + totalCommunes.toLocaleString('fr') + ' communes avec nuance officielle \u2014 Municipales 2020';
+    banner.appendChild(bannerDiv);
+    container.appendChild(banner);
+
+    // Filter pills
+    var pillSec = document.createElement('div');
+    pillSec.className = 'cmd-section';
+    var pillTitle = document.createElement('div');
+    pillTitle.className = 'cmd-section-title';
+    pillTitle.textContent = 'FAMILLES POLITIQUES';
+    pillSec.appendChild(pillTitle);
+
+    var pillsDiv = document.createElement('div');
+    pillsDiv.className = 'filter-pills';
+
+    // "Tous" pill
+    var allPill = document.createElement('button');
+    allPill.className = 'filter-pill' + (!activeFilter ? ' active' : '');
+    allPill.textContent = 'Tous';
+    if (!activeFilter) allPill.style.color = '#e2e4e9';
+    allPill.addEventListener('click', function() {
+      activeFilter = null;
+      updateFilter();
+      document.getElementById('cmd-content').textContent = '';
+      renderCmdPolitique();
+    });
+    pillsDiv.appendChild(allPill);
+
+    FAMILLES.forEach(function(fam) {
+      var pill = document.createElement('button');
+      pill.className = 'filter-pill' + (activeFilter === fam.key ? ' active' : '');
+      pill.textContent = fam.label;
+      if (activeFilter === fam.key) pill.style.color = fam.color;
+      pill.addEventListener('click', function() {
+        activeFilter = fam.key;
+        updateFilter();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdPolitique();
+      });
+      pillsDiv.appendChild(pill);
+    });
+    pillSec.appendChild(pillsDiv);
+    container.appendChild(pillSec);
+
+    // Legend with counts
+    var legSec = document.createElement('div');
+    legSec.className = 'cmd-section';
+    var legTitle = document.createElement('div');
+    legTitle.className = 'cmd-section-title';
+    legTitle.textContent = 'LEGENDE';
+    legSec.appendChild(legTitle);
+
+    FAMILLES.forEach(function(fam) {
+      var row = document.createElement('div');
+      row.className = 'legend-row';
+      row.style.cursor = 'pointer';
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = fam.color;
+      row.appendChild(swatch);
+      var txt = document.createElement('span');
+      txt.textContent = fam.label;
+      row.appendChild(txt);
+      var cnt = document.createElement('span');
+      cnt.className = 'legend-count';
+      cnt.textContent = (familleCounts[fam.key] || 0).toLocaleString('fr');
+      row.appendChild(cnt);
+      row.addEventListener('click', function() {
+        activeFilter = fam.key;
+        updateFilter();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdPolitique();
+      });
+      legSec.appendChild(row);
+    });
+    container.appendChild(legSec);
+
+    // Surveillance sub-legend note
+    var noteSec = document.createElement('div');
+    noteSec.className = 'cmd-section';
+    var noteText = document.createElement('div');
+    noteText.style.fontSize = '11px';
+    noteText.style.color = '#555';
+    noteText.textContent = 'Epaisseur bordure = effectif police municipale';
+    noteSec.appendChild(noteText);
+    container.appendChild(noteSec);
+  }
+
+  // --- renderCmdSurveillance ---
+  function renderCmdSurveillance() {
+    var container = document.getElementById('cmd-content');
+
+    // Filters section
+    var filterSec = document.createElement('div');
+    filterSec.className = 'cmd-section';
+    var filterTitle = document.createElement('div');
+    filterTitle.className = 'cmd-section-title';
+    filterTitle.textContent = 'FILTRES';
+    filterSec.appendChild(filterTitle);
+
+    // Ratio slider
+    var row1 = document.createElement('div');
+    row1.className = 'filter-row';
+    var lbl1 = document.createElement('span');
+    lbl1.style.color = '#8b8f98';
+    lbl1.textContent = 'Ratio min :';
+    row1.appendChild(lbl1);
+    var sl1 = document.createElement('input');
+    sl1.type = 'range';
+    sl1.min = '0';
+    sl1.max = '50';
+    sl1.step = '1';
+    sl1.value = survFilters.ratioMin.toString();
+    var sv1 = document.createElement('span');
+    sv1.className = 'slider-value';
+    sv1.textContent = survFilters.ratioMin.toString();
+    sl1.addEventListener('input', function() {
+      survFilters.ratioMin = parseInt(this.value, 10);
+      sv1.textContent = survFilters.ratioMin.toString();
+      geoLayer.setStyle(getStyle);
+      renderSurvStats();
+      updateBottomBar();
+    });
+    row1.appendChild(sl1);
+    row1.appendChild(sv1);
+    filterSec.appendChild(row1);
+
+    // Data only checkbox
+    var row2 = document.createElement('div');
+    row2.className = 'filter-row';
+    var lbl2 = document.createElement('label');
+    var cb2 = document.createElement('input');
+    cb2.type = 'checkbox';
+    cb2.checked = survFilters.dataOnly;
+    cb2.addEventListener('change', function() {
+      survFilters.dataOnly = this.checked;
+      geoLayer.setStyle(getStyle);
+      renderSurvStats();
+      updateBottomBar();
+    });
+    lbl2.appendChild(cb2);
+    lbl2.appendChild(document.createTextNode(' Donnees uniquement'));
+    row2.appendChild(lbl2);
+    filterSec.appendChild(row2);
+
+    container.appendChild(filterSec);
+
+    // Stats wrapper (re-rendered on filter change)
+    var statsWrap = document.createElement('div');
+    statsWrap.id = 'surv-stats-wrap';
+    container.appendChild(statsWrap);
+
+    renderSurvStats();
+
+    // Legend
+    var legSec = document.createElement('div');
+    legSec.className = 'cmd-section';
+    var legTitle = document.createElement('div');
+    legTitle.className = 'cmd-section-title';
+    legTitle.textContent = 'LEGENDE';
+    legSec.appendChild(legTitle);
+
+    SURV_COLORS.forEach(function(sc, idx) {
+      var next = SURV_COLORS[idx + 1];
+      var row = document.createElement('div');
+      row.className = 'legend-row';
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = sc.color;
+      row.appendChild(swatch);
+      var txt = document.createElement('span');
+      txt.textContent = next ? (sc.threshold + ' - ' + (next.threshold - 1) + ' /10k') : (sc.threshold + '+ /10k');
+      row.appendChild(txt);
+      legSec.appendChild(row);
+    });
+
+    // No data item
+    var ndRow = document.createElement('div');
+    ndRow.className = 'legend-row';
+    var ndSwatch = document.createElement('div');
+    ndSwatch.className = 'legend-swatch';
+    ndSwatch.style.background = '#2a2a3e';
+    ndSwatch.style.border = '1px dashed #555';
+    ndRow.appendChild(ndSwatch);
+    var ndTxt = document.createElement('span');
+    ndTxt.textContent = 'Pas de donnees';
+    ndRow.appendChild(ndTxt);
+    legSec.appendChild(ndRow);
+
+    container.appendChild(legSec);
+
+    // Source note
+    var srcSec = document.createElement('div');
+    srcSec.className = 'cmd-section';
+    var srcNote = document.createElement('div');
+    srcNote.style.fontSize = '11px';
+    srcNote.style.color = '#555';
+    srcNote.textContent = 'Police mun. : donnees 2024 | Pop. : INSEE 2021 | Ratio plafonne a 50';
+    srcSec.appendChild(srcNote);
+    container.appendChild(srcSec);
+  }
+
+  function renderSurvStats() {
+    var wrap = document.getElementById('surv-stats-wrap');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    // Per-famille breakdown (exclude "Non classe")
+    var famStats = {};
+    FAMILLES.forEach(function(f) {
+      if (f.key === 'Non class\u00e9') return;
+      famStats[f.key] = { count: 0, totalRatio: 0 };
+    });
+
+    for (var code in surv) {
+      var s = surv[code];
+      var m = maires[code];
+      if (!m || !s || s.r === undefined) continue;
+      if (m.f === 'Non class\u00e9') continue;
+      if (famStats[m.f]) {
+        famStats[m.f].count++;
+        famStats[m.f].totalRatio += (s.r || 0);
+      }
+    }
+
+    var statsSec = document.createElement('div');
+    statsSec.className = 'cmd-section';
+    var statsTitle = document.createElement('div');
+    statsTitle.className = 'cmd-section-title';
+    statsTitle.textContent = 'PAR FAMILLE POLITIQUE';
+    statsSec.appendChild(statsTitle);
+
+    var table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '12px';
+
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      th.style.padding = '4px 6px';
+      th.style.textAlign = 'left';
+      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
+      th.style.color = '#555';
+      th.style.fontWeight = '600';
+      th.style.fontSize = '10px';
+      th.style.textTransform = 'uppercase';
+      th.style.letterSpacing = '0.5px';
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    var maxRatio = 0;
+    var maxFam = '';
+
+    FAMILLES.forEach(function(fam) {
+      if (fam.key === 'Non class\u00e9') return;
+      var fs = famStats[fam.key];
+      if (!fs || fs.count === 0) return;
+      var avg = (fs.totalRatio / fs.count).toFixed(1);
+      if (parseFloat(avg) > maxRatio) {
+        maxRatio = parseFloat(avg);
+        maxFam = fam.label;
+      }
+      var tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function() {
+        activeFilter = fam.key;
+        updateFilter();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdSurveillance();
+      });
+
+      var td1 = document.createElement('td');
+      td1.style.padding = '4px 6px';
+      td1.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td1.style.color = '#8b8f98';
+      var swatch = document.createElement('span');
+      swatch.style.display = 'inline-block';
+      swatch.style.width = '8px';
+      swatch.style.height = '8px';
+      swatch.style.borderRadius = '2px';
+      swatch.style.background = fam.color;
+      swatch.style.marginRight = '6px';
+      td1.appendChild(swatch);
+      td1.appendChild(document.createTextNode(fam.label));
+
+      var td2 = document.createElement('td');
+      td2.style.padding = '4px 6px';
+      td2.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td2.style.color = '#8b8f98';
+      td2.textContent = fs.count.toString();
+
+      var td3 = document.createElement('td');
+      td3.style.padding = '4px 6px';
+      td3.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td3.style.color = '#e2e4e9';
+      td3.style.fontWeight = '500';
+      td3.textContent = avg;
+
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tr.appendChild(td3);
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    statsSec.appendChild(table);
+
+    // Summary
+    if (maxFam) {
+      // Find second highest for comparison
+      var secondRatio = 0;
+      var secondFam = '';
+      FAMILLES.forEach(function(fam) {
+        if (fam.key === 'Non class\u00e9') return;
+        var fs = famStats[fam.key];
+        if (!fs || fs.count === 0) return;
+        var avg = parseFloat((fs.totalRatio / fs.count).toFixed(1));
+        if (avg < maxRatio && avg > secondRatio) {
+          secondRatio = avg;
+          secondFam = fam.label;
+        }
+      });
+
+      var summary = document.createElement('div');
+      summary.style.fontSize = '12px';
+      summary.style.color = '#8b8f98';
+      summary.style.marginTop = '8px';
+      var txt = maxFam + ' a le ratio le plus eleve (' + maxRatio.toFixed(1) + '/10k)';
+      if (secondFam && secondRatio > 0) {
+        var pct = Math.round((maxRatio - secondRatio) / secondRatio * 100);
+        txt += ', ' + pct + '% de plus que ' + secondFam + ' (' + secondRatio.toFixed(1) + '/10k)';
+      }
+      summary.textContent = txt;
+      statsSec.appendChild(summary);
+    }
+
+    wrap.appendChild(statsSec);
+  }
+
+  // --- renderMethodo ---
+  function renderMethodo() {
+    var mc = document.getElementById('methodo-content');
+    mc.textContent = '';
+
+    function h3(text) {
+      var el = document.createElement('h3');
+      el.textContent = text;
+      mc.appendChild(el);
+      return el;
+    }
+    function p(text) {
+      var el = document.createElement('p');
+      el.textContent = text;
+      mc.appendChild(el);
+      return el;
+    }
+    function makeTable(headers, rows) {
+      var table = document.createElement('table');
+      var thead = document.createElement('thead');
+      var headRow = document.createElement('tr');
+      headers.forEach(function(h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      var tbody = document.createElement('tbody');
+      rows.forEach(function(row) {
+        var tr = document.createElement('tr');
+        row.forEach(function(cell) {
+          var td = document.createElement('td');
+          if (typeof cell === 'object' && cell.html) {
+            td.appendChild(cell.html);
+          } else {
+            td.textContent = cell;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      mc.appendChild(table);
+    }
+    function freshSpan(text, cls) {
+      var span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      return { html: span };
+    }
+
+    h3('Vue d\'ensemble');
+    p('34 844 communes de France metropolitaine et d\'outre-mer, 3 modes de visualisation.');
+    makeTable(
+      ['Mode', 'Donnees', 'Ce qu\'il montre'],
+      [
+        ['Politique', 'maires.json', 'Couleur politique du maire (municipales 2020)'],
+        ['Surveillance', 'surveillance.json', 'Densite de police municipale (agents / 10k hab.)'],
+        ['Prospection', 'prospection.json', 'Score composite de potentiel videoverbalisation']
+      ]
+    );
+
+    h3('Sources');
+    makeTable(
+      ['Donnee', 'Source', 'Annee', 'Couverture'],
+      [
+        ['Nuances politiques', 'Min. Interieur', '2020', '2 693 communes (7,7%)'],
+        ['Effectifs PM', 'Min. Interieur', '2024', '4 164 communes'],
+        ['Stationnement payant', 'GART / Cerema', '2019', '226 communes'],
+        ['Videoverbalisation', 'video-verbalisation.fr', '2025', '586 communes'],
+        ['Accidents routiers', 'ONISR (BAAC)', '2023-2024', '16 064 communes'],
+        ['Population', 'INSEE', '2021', '34 844 communes']
+      ]
+    );
+
+    h3('Score de prospection');
+    p('Moyenne ponderee de 5 signaux normalises (0-1), ramenee sur 100. Poids ajustables par l\'utilisateur.');
+    makeTable(
+      ['Signal', 'Poids', 'Description'],
+      [
+        ['Stationnement payant', '30%', 'Commune avec stationnement payant = besoin de verbalisation'],
+        ['Taille commune', '25%', 'Gaussienne log centree 30k hab. (cible ideale 5k-100k)'],
+        ['Effectif PM', '20%', 'Ratio agents / population (plus d\'agents = plus de moyens)'],
+        ['Accidents routiers', '15%', 'Taux d\'accidents corporels / 10k hab.'],
+        ['Croissance PM', '10%', 'Hausse des effectifs ponderee par le volume']
+      ]
+    );
+
+    h3('Biais connus');
+    var ol = document.createElement('ol');
+    [
+      'Biais en faveur des communes "moyennes" (signal taille = 25% du poids)',
+      'Sous-representation du stationnement payant (226 sur ~800+ reelles)',
+      'Ratio PM plafonne a 50/10k (ecrase les differences entre communes tres dotees)',
+      'Accidents corporels uniquement (exclut materiels et infractions sans accident)'
+    ].forEach(function(text) {
+      var li = document.createElement('li');
+      li.textContent = text;
+      ol.appendChild(li);
+    });
+    mc.appendChild(ol);
+
+    h3('Fraicheur des donnees');
+    makeTable(
+      ['Donnee', 'Annee', 'Etat'],
+      [
+        ['Population INSEE', '2021', freshSpan('4-5 ans', 'freshness-yellow')],
+        ['PM courant', '2024', freshSpan('1-2 ans', 'freshness-green')],
+        ['PM historique', '2019-2024', freshSpan('a jour', 'freshness-green')],
+        ['Stationnement payant', '2019', freshSpan('6-7 ans', 'freshness-orange')],
+        ['Videoverbalisation', '2025', freshSpan('< 1 an', 'freshness-green')],
+        ['Accidents', '2023-2024', freshSpan('1-2 ans', 'freshness-green')],
+        ['Nuances politiques', '2020', freshSpan('5-6 ans', 'freshness-orange')]
+      ]
+    );
+
+    h3('Donnees absentes');
+    var ul = document.createElement('ul');
+    [
+      'Budgets communaux securite (codes SIREN, pas de decoupage "securite" exploitable)',
+      'Statistiques de delinquance par commune (pas de dataset national open data)',
+      'Police intercommunale (mutualisations depuis 2019, non prises en compte)',
+      'Radars et PV automatises (pas de dataset national open data)'
+    ].forEach(function(text) {
+      var li = document.createElement('li');
+      li.textContent = text;
+      ul.appendChild(li);
+    });
+    mc.appendChild(ul);
+  }
+
+  // --- updateBottomBar ---
+  function updateBottomBar() {
+    var el = document.getElementById('bottom-stats');
+    if (!el) return;
+
+    if (currentMode === 'prospection') {
+      var filtered = 0;
+      var statPayantSansVV = 0;
+      var totalScore = 0;
+      var scored = 0;
+      for (var code in prosp) {
+        if (!passesProspFilters(code)) continue;
+        filtered++;
+        var pItem = prosp[code];
+        if (pItem.stat_payant && !pItem.videoverb) statPayantSansVV++;
+        var sc = computeProspScore(code);
+        if (sc !== null) { totalScore += sc; scored++; }
+      }
+      var avgScore = scored > 0 ? (totalScore / scored).toFixed(1) : '0';
+      el.textContent = filtered.toLocaleString('fr') + ' communes filtrees | ' +
+        statPayantSansVV + ' stat. payant sans VV | Score moyen : ' + avgScore;
+    } else if (currentMode === 'politique') {
+      var withNuance = 0;
+      var parts = [];
+      var fcLocal = {};
+      FAMILLES.forEach(function(f) { fcLocal[f.key] = 0; });
+      for (var code in maires) {
+        if (maires[code].f !== 'Non class\u00e9') withNuance++;
+        if (fcLocal[maires[code].f] !== undefined) fcLocal[maires[code].f]++;
+      }
+      FAMILLES.forEach(function(f) {
+        if (f.key !== 'Non class\u00e9' && fcLocal[f.key] > 0) {
+          parts.push(f.label + ' : ' + fcLocal[f.key]);
+        }
+      });
+      el.textContent = withNuance.toLocaleString('fr') + ' communes avec nuance | ' + parts.join(' | ');
+    } else {
+      var withData = 0;
+      var totalRatio = 0;
+      var ratioCount = 0;
+      for (var code in surv) {
+        withData++;
+        if (surv[code].r) { totalRatio += surv[code].r; ratioCount++; }
+      }
+      var avgRatio = ratioCount > 0 ? (totalRatio / ratioCount).toFixed(1) : '0';
+      el.textContent = withData.toLocaleString('fr') + ' communes avec donnees | Ratio moyen : ' + avgRatio + ' /10k';
+    }
   }
 
   // --- Methodology drawer open/close ---
@@ -783,6 +1935,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
       setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
     }
+    openDetail(code);
   }
 
   searchInput.addEventListener('input', function() {
@@ -820,6 +1973,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   // --- Hide loading, apply initial state ---
   document.getElementById('loading').style.display = 'none';
+
+  // Render initial panels
+  renderCmdProspection();
+  renderMethodo();
+  updateBottomBar();
 
   // Initial mode indicator position (after layout is visible)
   setTimeout(updateModeIndicator, 0);
