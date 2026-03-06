@@ -183,6 +183,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       <button class="mode-btn active" data-mode="prospection">Prospection</button>
       <button class="mode-btn" data-mode="politique">Politique</button>
       <button class="mode-btn" data-mode="surveillance">Surveillance</button>
+      <button class="mode-btn" data-mode="securite">Securite</button>
       <div id="mode-indicator"></div>
     </div>
     <button id="btn-methodo" title="Methodologie et sources">?</button>
@@ -250,7 +251,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fetchJSON('maires.json'),
       fetchJSON('surveillance.json'),
       fetchJSON('prospection.json'),
-      fetchJSON('communes-topo.json')
+      fetchJSON('communes-topo.json'),
+      fetchJSON('delinquance.json'),
+      fetchJSON('enrichment.json')
     ]);
   } catch (err) {
     document.getElementById('load-text').textContent = 'Erreur de chargement';
@@ -262,6 +265,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var surv = results[1];
   var prosp = results[2];
   var topoData = results[3];
+  var delinq = results[4];
+  var enrich = results[5];
 
   status.textContent = 'Construction de la carte...';
 
@@ -291,6 +296,18 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // --- State ---
   var activeFilter = null;
   var currentMode = 'prospection';
+  var secuFilter = null;
+  var secuFilters = { ratioMin: 0, dataOnly: false };
+
+  var DELINQ_LABELS = {
+    cambr: 'Cambriolages', destr: 'Destructions/degrad.', escro: 'Escroqueries',
+    traf_stup: 'Trafic stupefiants', usage_stup: 'Usage stupefiants',
+    usage_stup_afd: 'Usage stup. (AFD)', viol_phys: 'Violences physiques',
+    viol_intraf: 'Violences intrafam.', viol_sex: 'Violences sexuelles',
+    vols_armes: 'Vols avec armes', vols_acc_veh: 'Vols access. vehicules',
+    vols_ds_veh: 'Vols dans vehicules', vols_veh: 'Vols de vehicules',
+    vols_sv: 'Vols sans violence', vols_viol: 'Vols violents'
+  };
 
   var SURV_COLORS = [
     { threshold: 0,  color: '#FFFFB2' },
@@ -415,13 +432,19 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         'Transformation : courbe gaussienne en log centree sur 30 000 habitants (sigma = 1.2). ' +
         'Formule : exp(-0.5 * ((ln(pop) - ln(30000)) / 1.2)^2). ' +
         'Le signal vaut ~1 pour 30k hab., ~0.7 pour 10k ou 90k, et tend vers 0 pour les tres petites ou tres grandes communes. ' +
-        'Logique : les communes entre 5k et 100k sont la cible ideale -- assez grandes pour avoir des besoins, pas trop pour etre deja equipees.' }
+        'Logique : les communes entre 5k et 100k sont la cible ideale -- assez grandes pour avoir des besoins, pas trop pour etre deja equipees.' },
+    { key: 'budget_capacity', label: 'Capacite budgetaire',      weight: 0, year: '2022',
+      desc: 'DGF par habitant (DGFiP 2022)',
+      detail: 'Source : comptes des communes (DGFiP, 2022). ' +
+        'DGF (dotation globale de fonctionnement) par habitant, normalisee sur 500 euros/hab. max. ' +
+        'Signal : dgf_hab / 500, plafonne a 1. ' +
+        'Logique : une commune avec des moyens financiers eleves est plus susceptible d\'investir dans la videoverbalisation.' }
   ];
 
   var prospWeights = {};
   PROSP_SIGNALS.forEach(function(s) { prospWeights[s.key] = s.weight; });
 
-  var prospFilters = { statPayantOnly: false, noVideoverb: false, popMin: 0 };
+  var prospFilters = { statPayantOnly: false, noVideoverb: false, popMin: 0, qpvOnly: false };
 
   // Score cache -- invalidated when weights change
   var prospScoreCache = null;
@@ -477,6 +500,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     } else {
       signals.pop_sweet = 0;
     }
+    // Budget capacity from enrichment data
+    var enData = enrich[code];
+    if (enData && enData.dgf_hab) {
+      signals.budget_capacity = Math.min(enData.dgf_hab / 500, 1);
+    } else {
+      signals.budget_capacity = 0;
+    }
 
     var totalWeight = 0;
     var weightedSum = 0;
@@ -510,6 +540,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     if (prospFilters.noVideoverb && p.videoverb) return false;
     var pop = p.pop || 0;
     if (pop < prospFilters.popMin) return false;
+    var pCode = typeof codeOrData === 'string' ? codeOrData : null;
+    if (prospFilters.qpvOnly && (!pCode || !enrich[pCode] || !enrich[pCode].qpv)) return false;
     return true;
   }
 
@@ -527,7 +559,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var p = prosp[code];
     if (!p) return { fillColor: '#333', fillOpacity: 0.08, weight: 0.2, color: '#222', opacity: 0.3 };
 
-    if (!passesProspFilters(p))
+    if (!passesProspFilters(code))
       return { fillColor: '#444', fillOpacity: 0.1, weight: 0.2, color: '#222', opacity: 0.3 };
 
     var score = computeProspScore(code);
@@ -542,10 +574,62 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     };
   }
 
+  // --- Securite color scale (violet/magenta) ---
+  var SECU_COLORS = [
+    { threshold: 0,   color: '#1a1a2e' },
+    { threshold: 20,  color: '#4a1942' },
+    { threshold: 50,  color: '#7b2d5f' },
+    { threshold: 100, color: '#b5446e' },
+    { threshold: 200, color: '#e8665c' },
+    { threshold: 400, color: '#f5a623' }
+  ];
+
+  function getSecuRatio(code) {
+    var d = delinq[code];
+    if (!d) return null;
+    if (!secuFilter) return d.r || 0;
+    var catVal = (d.cats && d.cats[secuFilter]) || 0;
+    var pop = d.pop || 1;
+    return Math.round(catVal / pop * 10000 * 10) / 10;
+  }
+
+  // Style function -- securite mode
+  function getStyleSecurite(feature) {
+    var code = feature.properties.codgeo;
+    var d = delinq[code];
+    var m = maires[code];
+
+    if (!d) {
+      if (secuFilters.dataOnly) return { fillOpacity: 0, weight: 0, opacity: 0 };
+      return { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
+    }
+
+    var ratio = getSecuRatio(code);
+    if (ratio === null) ratio = 0;
+
+    if (ratio < secuFilters.ratioMin)
+      return { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3 };
+    if (activeFilter && m && m.f !== activeFilter)
+      return { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
+
+    if (ratio === 0) {
+      return { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4 };
+    }
+
+    return {
+      fillColor: getThresholdColor(ratio, SECU_COLORS),
+      fillOpacity: 0.85,
+      weight: 0.3,
+      color: '#333',
+      opacity: 0.4
+    };
+  }
+
   // Style dispatcher
   function getStyle(feature) {
     if (currentMode === 'surveillance') return getStyleSurveillance(feature);
     if (currentMode === 'prospection') return getStyleProspection(feature);
+    if (currentMode === 'securite') return getStyleSecurite(feature);
     return getStylePolitique(feature);
   }
 
@@ -577,6 +661,15 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       infoMetric.textContent = score !== null ? 'Score : ' + score + '/100' : 'Score : N/A';
     } else if (currentMode === 'politique') {
       infoMetric.textContent = m ? (m.f + ' \u2014 ' + m.lb + ' (' + m.nu + ')') : 'Pas de donnees';
+    } else if (currentMode === 'securite') {
+      var d = delinq[code];
+      if (d) {
+        var sRatio = getSecuRatio(code);
+        var catLabel = secuFilter ? (DELINQ_LABELS[secuFilter] || secuFilter) : 'Total';
+        infoMetric.textContent = catLabel + ' : ' + (sRatio !== null ? sRatio : 0) + ' /10k hab';
+      } else {
+        infoMetric.textContent = 'Pas de donnees';
+      }
     } else {
       var s = surv[code];
       if (s && s.r) {
@@ -839,18 +932,205 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       content.appendChild(sigSec);
     }
 
-    // Missing data section
+    // QPV badge (in surveillance section or standalone)
+    var en = enrich[code];
+    if (en && en.qpv) {
+      var qpvBadge = document.createElement('span');
+      qpvBadge.className = 'detail-badge';
+      qpvBadge.style.background = '#8e44ad';
+      qpvBadge.style.color = '#fff';
+      qpvBadge.style.marginTop = '6px';
+      qpvBadge.style.display = 'inline-block';
+      qpvBadge.textContent = 'QPV : ' + en.qpv + ' quartier' + (en.qpv > 1 ? 's' : '');
+      var qpvWrap = document.createElement('div');
+      qpvWrap.style.marginTop = '4px';
+      qpvWrap.appendChild(qpvBadge);
+      // Append to surveillance section if it exists, else to last section
+      var lastSec = content.lastChild;
+      if (lastSec) lastSec.appendChild(qpvWrap);
+    }
+
+    // Delinquance section
+    var dl = delinq[code];
+    if (dl) {
+      var delSec = document.createElement('div');
+      delSec.className = 'detail-section';
+
+      var delTitleRow = document.createElement('div');
+      delTitleRow.style.display = 'flex';
+      delTitleRow.style.alignItems = 'center';
+      delTitleRow.style.gap = '8px';
+      var delTitle = document.createElement('span');
+      delTitle.className = 'cmd-section-title';
+      delTitle.style.marginBottom = '0';
+      delTitle.textContent = 'DELINQUANCE ENREGISTREE';
+      delTitleRow.appendChild(delTitle);
+      var delFresh = document.createElement('span');
+      delFresh.className = 'detail-badge';
+      delFresh.style.background = 'rgba(39,174,96,0.15)';
+      delFresh.style.color = '#27ae60';
+      delFresh.style.fontSize = '10px';
+      delFresh.textContent = dl.year || '2024';
+      delTitleRow.appendChild(delFresh);
+      delSec.appendChild(delTitleRow);
+
+      // Large ratio
+      var delRatioBig = document.createElement('div');
+      delRatioBig.className = 'detail-score-big';
+      delRatioBig.style.color = '#c0392b';
+      delRatioBig.style.marginTop = '6px';
+      delRatioBig.textContent = (dl.r || 0) + ' /10k';
+      delSec.appendChild(delRatioBig);
+
+      var delTotal = document.createElement('div');
+      delTotal.style.fontSize = '12px';
+      delTotal.style.color = '#8b8f98';
+      delTotal.textContent = (dl.total || 0).toLocaleString('fr') + ' faits constates';
+      delSec.appendChild(delTotal);
+
+      // Category breakdown: horizontal bars sorted by volume
+      if (dl.cats) {
+        var catEntries = [];
+        for (var catKey in dl.cats) {
+          catEntries.push({ key: catKey, count: dl.cats[catKey] });
+        }
+        catEntries.sort(function(a, b) { return b.count - a.count; });
+        var maxCatCount = catEntries.length > 0 ? catEntries[0].count : 1;
+
+        var catWrap = document.createElement('div');
+        catWrap.style.marginTop = '8px';
+        catEntries.forEach(function(cat) {
+          var catRow = document.createElement('div');
+          catRow.style.display = 'flex';
+          catRow.style.alignItems = 'center';
+          catRow.style.gap = '6px';
+          catRow.style.margin = '3px 0';
+          catRow.style.fontSize = '11px';
+
+          var catLbl = document.createElement('span');
+          catLbl.style.width = '130px';
+          catLbl.style.flexShrink = '0';
+          catLbl.style.color = '#8b8f98';
+          catLbl.style.overflow = 'hidden';
+          catLbl.style.textOverflow = 'ellipsis';
+          catLbl.style.whiteSpace = 'nowrap';
+          catLbl.textContent = DELINQ_LABELS[cat.key] || cat.key;
+          catRow.appendChild(catLbl);
+
+          var catBarBg = document.createElement('div');
+          catBarBg.style.flex = '1';
+          catBarBg.style.height = '5px';
+          catBarBg.style.background = 'rgba(255,255,255,0.06)';
+          catBarBg.style.borderRadius = '3px';
+          catBarBg.style.overflow = 'hidden';
+          var catBarFill = document.createElement('div');
+          catBarFill.style.height = '100%';
+          catBarFill.style.borderRadius = '3px';
+          catBarFill.style.width = Math.round(cat.count / maxCatCount * 100) + '%';
+          catBarFill.style.background = '#c0392b';
+          catBarBg.appendChild(catBarFill);
+          catRow.appendChild(catBarBg);
+
+          var catCount = document.createElement('span');
+          catCount.style.minWidth = '35px';
+          catCount.style.textAlign = 'right';
+          catCount.style.color = '#e2e4e9';
+          catCount.style.fontWeight = '500';
+          catCount.textContent = cat.count.toLocaleString('fr');
+          catRow.appendChild(catCount);
+
+          var catRatio = document.createElement('span');
+          catRatio.style.minWidth = '45px';
+          catRatio.style.textAlign = 'right';
+          catRatio.style.color = '#555';
+          var crPop = dl.pop || 1;
+          catRatio.textContent = (Math.round(cat.count / crPop * 10000 * 10) / 10) + '/10k';
+          catRow.appendChild(catRatio);
+
+          catWrap.appendChild(catRow);
+        });
+        delSec.appendChild(catWrap);
+      }
+
+      content.appendChild(delSec);
+    }
+
+    // Socio-economic section
+    if (en && (en.rev_med || en.dgf_hab || en.dette_hab || en.cafn_hab)) {
+      var ecoSec = document.createElement('div');
+      ecoSec.className = 'detail-section';
+
+      var ecoTitle = document.createElement('div');
+      ecoTitle.className = 'cmd-section-title';
+      ecoTitle.textContent = 'CONTEXTE SOCIO-ECONOMIQUE';
+      ecoSec.appendChild(ecoTitle);
+
+      function addEcoRow(label, value, freshYear, freshColor) {
+        var row = document.createElement('div');
+        row.className = 'detail-kv';
+        var lbl = document.createElement('span');
+        lbl.className = 'detail-kv-label';
+        lbl.textContent = label;
+        var val = document.createElement('span');
+        val.className = 'detail-kv-value';
+        val.style.display = 'flex';
+        val.style.alignItems = 'center';
+        val.style.gap = '6px';
+        var valText = document.createTextNode(value);
+        val.appendChild(valText);
+        if (freshYear) {
+          var fb = document.createElement('span');
+          fb.className = 'detail-badge';
+          fb.style.fontSize = '9px';
+          fb.style.padding = '1px 5px';
+          fb.style.background = 'rgba(' + (freshColor === '#27ae60' ? '39,174,96' : (freshColor === '#f39c12' ? '243,156,18' : '230,126,34')) + ',0.15)';
+          fb.style.color = freshColor;
+          fb.textContent = freshYear;
+          val.appendChild(fb);
+        }
+        row.appendChild(lbl);
+        row.appendChild(val);
+        ecoSec.appendChild(row);
+      }
+
+      if (en.rev_med) {
+        addEcoRow('Revenu median', en.rev_med.toLocaleString('fr') + ' \u20ac', '2013', '#e67e22');
+      }
+      if (en.dgf_hab !== undefined) {
+        addEcoRow('DGF / habitant', en.dgf_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
+      }
+      if (en.dette_hab !== undefined) {
+        addEcoRow('Dette / habitant', en.dette_hab.toFixed(1) + ' \u20ac', null, null);
+      }
+      if (en.cafn_hab !== undefined) {
+        addEcoRow('CAF nette / hab.', en.cafn_hab.toFixed(1) + ' \u20ac', null, null);
+      }
+      if (en.perso_hab !== undefined) {
+        addEcoRow('Charges personnel / hab.', en.perso_hab.toFixed(1) + ' \u20ac', null, null);
+      }
+
+      content.appendChild(ecoSec);
+    }
+
+    // Missing data section (only show truly missing items)
     var missSec = document.createElement('div');
     missSec.className = 'detail-section';
-    var miss1 = document.createElement('div');
-    miss1.className = 'detail-missing';
-    miss1.textContent = 'Budget securite communal : non disponible';
-    missSec.appendChild(miss1);
-    var miss2 = document.createElement('div');
-    miss2.className = 'detail-missing';
-    miss2.textContent = 'Statistiques delinquance : non disponible';
-    missSec.appendChild(miss2);
-    content.appendChild(missSec);
+    var hasMissing = false;
+    if (!dl) {
+      var miss1 = document.createElement('div');
+      miss1.className = 'detail-missing';
+      miss1.textContent = 'Statistiques delinquance : non disponible (commune < seuil)';
+      missSec.appendChild(miss1);
+      hasMissing = true;
+    }
+    if (!en || (!en.rev_med && !en.dgf_hab)) {
+      var miss2 = document.createElement('div');
+      miss2.className = 'detail-missing';
+      miss2.textContent = 'Donnees socio-economiques : non disponible';
+      missSec.appendChild(miss2);
+      hasMissing = true;
+    }
+    if (hasMissing) content.appendChild(missSec);
 
     panel.classList.add('open');
   }
@@ -893,7 +1173,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   // --- Mode toggle ---
-  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4' };
+  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4', securite: '#c0392b' };
   var modeIndicator = document.getElementById('mode-indicator');
 
   function updateModeIndicator() {
@@ -915,9 +1195,15 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     // Clear cmd-content
     document.getElementById('cmd-content').textContent = '';
 
+    if (mode === 'securite') {
+      secuFilter = null;
+      secuFilters = { ratioMin: 0, dataOnly: false };
+    }
+
     if (mode === 'prospection') renderCmdProspection();
     else if (mode === 'politique') renderCmdPolitique();
     else if (mode === 'surveillance') renderCmdSurveillance();
+    else if (mode === 'securite') renderCmdSecurite();
 
     // Hide info tooltip
     infoPanel.style.display = 'none';
@@ -995,6 +1281,25 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     lbl2.appendChild(document.createTextNode(' Sans videoverbalisation'));
     row2.appendChild(lbl2);
     filterSec.appendChild(row2);
+
+    // QPV only checkbox
+    var rowQpv = document.createElement('div');
+    rowQpv.className = 'filter-row';
+    var lblQpv = document.createElement('label');
+    var cbQpv = document.createElement('input');
+    cbQpv.type = 'checkbox';
+    cbQpv.checked = prospFilters.qpvOnly;
+    cbQpv.addEventListener('change', function() {
+      prospFilters.qpvOnly = this.checked;
+      invalidateProspCache();
+      geoLayer.setStyle(getStyle);
+      renderProspectList();
+      updateBottomBar();
+    });
+    lblQpv.appendChild(cbQpv);
+    lblQpv.appendChild(document.createTextNode(' Commune avec QPV'));
+    rowQpv.appendChild(lblQpv);
+    filterSec.appendChild(rowQpv);
 
     // Pop min slider
     var row3 = document.createElement('div');
@@ -1650,6 +1955,263 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     wrap.appendChild(statsSec);
   }
 
+  // --- renderCmdSecurite ---
+  function renderCmdSecurite() {
+    var container = document.getElementById('cmd-content');
+
+    // A. Filters section
+    var filterSec = document.createElement('div');
+    filterSec.className = 'cmd-section';
+    var filterTitle = document.createElement('div');
+    filterTitle.className = 'cmd-section-title';
+    filterTitle.textContent = 'FILTRES';
+    filterSec.appendChild(filterTitle);
+
+    // Category pills
+    var pillsDiv = document.createElement('div');
+    pillsDiv.className = 'filter-pills';
+
+    var allPill = document.createElement('button');
+    allPill.className = 'filter-pill' + (!secuFilter ? ' active' : '');
+    allPill.textContent = 'Tous';
+    if (!secuFilter) allPill.style.color = '#c0392b';
+    allPill.addEventListener('click', function() {
+      secuFilter = null;
+      geoLayer.setStyle(getStyle);
+      document.getElementById('cmd-content').textContent = '';
+      renderCmdSecurite();
+      updateBottomBar();
+    });
+    pillsDiv.appendChild(allPill);
+
+    var catKeys = [];
+    for (var ck in DELINQ_LABELS) catKeys.push(ck);
+    catKeys.forEach(function(key) {
+      var pill = document.createElement('button');
+      pill.className = 'filter-pill' + (secuFilter === key ? ' active' : '');
+      pill.textContent = DELINQ_LABELS[key];
+      if (secuFilter === key) pill.style.color = '#c0392b';
+      pill.addEventListener('click', function() {
+        secuFilter = key;
+        geoLayer.setStyle(getStyle);
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdSecurite();
+        updateBottomBar();
+      });
+      pillsDiv.appendChild(pill);
+    });
+    filterSec.appendChild(pillsDiv);
+
+    // Ratio min slider
+    var row1 = document.createElement('div');
+    row1.className = 'filter-row';
+    row1.style.marginTop = '8px';
+    var lbl1 = document.createElement('span');
+    lbl1.style.color = '#8b8f98';
+    lbl1.textContent = 'Ratio min :';
+    row1.appendChild(lbl1);
+    var sl1 = document.createElement('input');
+    sl1.type = 'range';
+    sl1.min = '0';
+    sl1.max = '500';
+    sl1.step = '10';
+    sl1.value = secuFilters.ratioMin.toString();
+    var sv1 = document.createElement('span');
+    sv1.className = 'slider-value';
+    sv1.textContent = secuFilters.ratioMin.toString();
+    sl1.addEventListener('input', function() {
+      secuFilters.ratioMin = parseInt(this.value, 10);
+      sv1.textContent = secuFilters.ratioMin.toString();
+      geoLayer.setStyle(getStyle);
+      renderSecuStats();
+      updateBottomBar();
+    });
+    row1.appendChild(sl1);
+    row1.appendChild(sv1);
+    filterSec.appendChild(row1);
+
+    // Data only checkbox
+    var row2 = document.createElement('div');
+    row2.className = 'filter-row';
+    var lbl2 = document.createElement('label');
+    var cb2 = document.createElement('input');
+    cb2.type = 'checkbox';
+    cb2.checked = secuFilters.dataOnly;
+    cb2.addEventListener('change', function() {
+      secuFilters.dataOnly = this.checked;
+      geoLayer.setStyle(getStyle);
+      renderSecuStats();
+      updateBottomBar();
+    });
+    lbl2.appendChild(cb2);
+    lbl2.appendChild(document.createTextNode(' Donnees uniquement'));
+    row2.appendChild(lbl2);
+    filterSec.appendChild(row2);
+
+    container.appendChild(filterSec);
+
+    // Stats wrapper
+    var statsWrap = document.createElement('div');
+    statsWrap.id = 'secu-stats-wrap';
+    container.appendChild(statsWrap);
+    renderSecuStats();
+
+    // Legend
+    var legSec = document.createElement('div');
+    legSec.className = 'cmd-section';
+    var legTitle = document.createElement('div');
+    legTitle.className = 'cmd-section-title';
+    legTitle.textContent = 'LEGENDE';
+    legSec.appendChild(legTitle);
+
+    SECU_COLORS.forEach(function(sc, idx) {
+      var next = SECU_COLORS[idx + 1];
+      var row = document.createElement('div');
+      row.className = 'legend-row';
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = sc.color;
+      row.appendChild(swatch);
+      var txt = document.createElement('span');
+      txt.textContent = next ? (sc.threshold + ' - ' + (next.threshold - 1) + ' /10k') : (sc.threshold + '+ /10k');
+      row.appendChild(txt);
+      legSec.appendChild(row);
+    });
+
+    var ndRow = document.createElement('div');
+    ndRow.className = 'legend-row';
+    var ndSwatch = document.createElement('div');
+    ndSwatch.className = 'legend-swatch';
+    ndSwatch.style.background = '#2a2a3e';
+    ndSwatch.style.border = '1px dashed #555';
+    ndRow.appendChild(ndSwatch);
+    var ndTxt = document.createElement('span');
+    ndTxt.textContent = 'Pas de donnees';
+    ndRow.appendChild(ndTxt);
+    legSec.appendChild(ndRow);
+
+    container.appendChild(legSec);
+
+    // Source note
+    var srcSec = document.createElement('div');
+    srcSec.className = 'cmd-section';
+    var srcNote = document.createElement('div');
+    srcNote.style.fontSize = '11px';
+    srcNote.style.color = '#555';
+    srcNote.textContent = 'Delinquance : Min. Interieur 2024 | ~9 400 communes (seuil de diffusion)';
+    srcSec.appendChild(srcNote);
+    container.appendChild(srcSec);
+  }
+
+  function renderSecuStats() {
+    var wrap = document.getElementById('secu-stats-wrap');
+    if (!wrap) return;
+    wrap.textContent = '';
+
+    var famStats = {};
+    FAMILLES.forEach(function(f) {
+      if (f.key === 'Non class\u00e9') return;
+      famStats[f.key] = { count: 0, totalRatio: 0 };
+    });
+
+    for (var code in delinq) {
+      var d = delinq[code];
+      var m = maires[code];
+      if (!m || !d) continue;
+      if (m.f === 'Non class\u00e9') continue;
+      var ratio = getSecuRatio(code);
+      if (ratio === null || ratio < secuFilters.ratioMin) continue;
+      if (famStats[m.f]) {
+        famStats[m.f].count++;
+        famStats[m.f].totalRatio += ratio;
+      }
+    }
+
+    var statsSec = document.createElement('div');
+    statsSec.className = 'cmd-section';
+    var statsTitle = document.createElement('div');
+    statsTitle.className = 'cmd-section-title';
+    statsTitle.textContent = 'PAR FAMILLE POLITIQUE';
+    statsSec.appendChild(statsTitle);
+
+    var table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '12px';
+
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
+      var th = document.createElement('th');
+      th.textContent = h;
+      th.style.padding = '4px 6px';
+      th.style.textAlign = 'left';
+      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
+      th.style.color = '#555';
+      th.style.fontWeight = '600';
+      th.style.fontSize = '10px';
+      th.style.textTransform = 'uppercase';
+      th.style.letterSpacing = '0.5px';
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+
+    FAMILLES.forEach(function(fam) {
+      if (fam.key === 'Non class\u00e9') return;
+      var fs = famStats[fam.key];
+      if (!fs || fs.count === 0) return;
+      var avg = (fs.totalRatio / fs.count).toFixed(1);
+
+      var tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function() {
+        activeFilter = fam.key;
+        updateFilter();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdSecurite();
+      });
+
+      var td1 = document.createElement('td');
+      td1.style.padding = '4px 6px';
+      td1.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td1.style.color = '#8b8f98';
+      var swatch = document.createElement('span');
+      swatch.style.display = 'inline-block';
+      swatch.style.width = '8px';
+      swatch.style.height = '8px';
+      swatch.style.borderRadius = '2px';
+      swatch.style.background = fam.color;
+      swatch.style.marginRight = '6px';
+      td1.appendChild(swatch);
+      td1.appendChild(document.createTextNode(fam.label));
+
+      var td2 = document.createElement('td');
+      td2.style.padding = '4px 6px';
+      td2.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td2.style.color = '#8b8f98';
+      td2.textContent = fs.count.toString();
+
+      var td3 = document.createElement('td');
+      td3.style.padding = '4px 6px';
+      td3.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+      td3.style.color = '#e2e4e9';
+      td3.style.fontWeight = '500';
+      td3.textContent = avg;
+
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tr.appendChild(td3);
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    statsSec.appendChild(table);
+    wrap.appendChild(statsSec);
+  }
+
   // --- renderMethodo ---
   function renderMethodo() {
     var mc = document.getElementById('methodo-content');
@@ -1703,13 +2265,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     }
 
     h3('Vue d\'ensemble');
-    p('34 844 communes de France metropolitaine et d\'outre-mer, 3 modes de visualisation.');
+    p('34 844 communes de France metropolitaine et d\'outre-mer, 4 modes de visualisation.');
     makeTable(
       ['Mode', 'Donnees', 'Ce qu\'il montre'],
       [
         ['Politique', 'maires.json', 'Couleur politique du maire (municipales 2020)'],
         ['Surveillance', 'surveillance.json', 'Densite de police municipale (agents / 10k hab.)'],
-        ['Prospection', 'prospection.json', 'Score composite de potentiel videoverbalisation']
+        ['Prospection', 'prospection.json', 'Score composite de potentiel videoverbalisation'],
+        ['Securite', 'delinquance.json', 'Taux de delinquance enregistree / 10k hab.']
       ]
     );
 
@@ -1722,12 +2285,21 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         ['Stationnement payant', 'GART / Cerema', '2019', '226 communes'],
         ['Videoverbalisation', 'video-verbalisation.fr', '2025', '586 communes'],
         ['Accidents routiers', 'ONISR (BAAC)', '2023-2024', '16 064 communes'],
-        ['Population', 'INSEE', '2021', '34 844 communes']
+        ['Population', 'INSEE', '2021', '34 844 communes'],
+        ['Delinquance', 'Min. Interieur', '2024', '~9 400 communes'],
+        ['QPV', 'ANCT', '2024', '843 communes'],
+        ['Comptes communes', 'DGFiP', '2022', '~35 000 communes'],
+        ['Revenus', 'Filosofi / INSEE', '2013', '~33 000 communes']
       ]
     );
 
+    h3('Mode securite');
+    p('Visualise le taux de delinquance enregistree pour ~9 400 communes (donnees SSMSI, Min. Interieur, 2024). ' +
+      'Les communes en dessous du seuil de diffusion (~2 000 hab.) ne sont pas couvertes. ' +
+      'Filtrage par categorie de delinquance et croisement par famille politique possibles.');
+
     h3('Score de prospection');
-    p('Moyenne ponderee de 5 signaux normalises (0-1), ramenee sur 100. Poids ajustables par l\'utilisateur.');
+    p('Moyenne ponderee de 6 signaux normalises (0-1), ramenee sur 100. Poids ajustables par l\'utilisateur.');
     makeTable(
       ['Signal', 'Poids', 'Description'],
       [
@@ -1735,7 +2307,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         ['Taille commune', '25%', 'Gaussienne log centree 30k hab. (cible ideale 5k-100k)'],
         ['Effectif PM', '20%', 'Ratio agents / population (plus d\'agents = plus de moyens)'],
         ['Accidents routiers', '15%', 'Taux d\'accidents corporels / 10k hab.'],
-        ['Croissance PM', '10%', 'Hausse des effectifs ponderee par le volume']
+        ['Croissance PM', '10%', 'Hausse des effectifs ponderee par le volume'],
+        ['Capacite budgetaire', '0%', 'DGF/hab. normalisee (DGFiP 2022, poids par defaut 0)']
       ]
     );
 
@@ -1745,7 +2318,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       'Biais en faveur des communes "moyennes" (signal taille = 25% du poids)',
       'Sous-representation du stationnement payant (226 sur ~800+ reelles)',
       'Ratio PM plafonne a 50/10k (ecrase les differences entre communes tres dotees)',
-      'Accidents corporels uniquement (exclut materiels et infractions sans accident)'
+      'Accidents corporels uniquement (exclut materiels et infractions sans accident)',
+      'Delinquance : donnees masquees pour les petites communes (seuil de diffusion SSMSI)',
+      'Revenus : donnees de 2013 (Filosofi), potentiellement obsoletes',
+      'Paris/Lyon/Marseille : revenus absents (probleme d\'arrondissements)'
     ].forEach(function(text) {
       var li = document.createElement('li');
       li.textContent = text;
@@ -1763,7 +2339,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         ['Stationnement payant', '2019', freshSpan('6-7 ans', 'freshness-orange')],
         ['Videoverbalisation', '2025', freshSpan('< 1 an', 'freshness-green')],
         ['Accidents', '2023-2024', freshSpan('1-2 ans', 'freshness-green')],
-        ['Nuances politiques', '2020', freshSpan('5-6 ans', 'freshness-orange')]
+        ['Nuances politiques', '2020', freshSpan('5-6 ans', 'freshness-orange')],
+        ['Delinquance', '2024', freshSpan('1-2 ans', 'freshness-green')],
+        ['QPV', '2024', freshSpan('1-2 ans', 'freshness-green')],
+        ['Comptes communes', '2022', freshSpan('3-4 ans', 'freshness-yellow')],
+        ['Revenus medians', '2013', freshSpan('12-13 ans', 'freshness-orange')]
       ]
     );
 
@@ -1771,7 +2351,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var ul = document.createElement('ul');
     [
       'Budgets communaux securite (codes SIREN, pas de decoupage "securite" exploitable)',
-      'Statistiques de delinquance par commune (pas de dataset national open data)',
       'Police intercommunale (mutualisations depuis 2019, non prises en compte)',
       'Radars et PV automatises (pas de dataset national open data)'
     ].forEach(function(text) {
@@ -1818,6 +2397,18 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         }
       });
       el.textContent = withNuance.toLocaleString('fr') + ' communes avec nuance | ' + parts.join(' | ');
+    } else if (currentMode === 'securite') {
+      var secWithData = 0;
+      var secTotalRatio = 0;
+      var secRatioCount = 0;
+      for (var code in delinq) {
+        secWithData++;
+        var secR = getSecuRatio(code);
+        if (secR !== null && secR >= secuFilters.ratioMin) { secTotalRatio += secR; secRatioCount++; }
+      }
+      var secAvg = secRatioCount > 0 ? (secTotalRatio / secRatioCount).toFixed(1) : '0';
+      var secCatLabel = secuFilter ? (DELINQ_LABELS[secuFilter] || secuFilter) : 'Tous';
+      el.textContent = secWithData.toLocaleString('fr') + ' communes avec donnees | Ratio moyen : ' + secAvg + ' /10k | ' + secCatLabel;
     } else {
       var withData = 0;
       var totalRatio = 0;
