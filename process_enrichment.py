@@ -163,11 +163,6 @@ def parse_comptes():
         if v is not None:
             rec["dgf_hab"] = round(v, 1)
 
-        # DGF total (in thousands EUR)
-        v = safe_float(entry.get("dgf"))
-        if v is not None:
-            rec["dgf"] = round(v, 1)
-
         # Dette per inhabitant
         v = safe_float(entry.get("fdette"))
         if v is not None:
@@ -182,21 +177,6 @@ def parse_comptes():
         v = safe_float(entry.get("fperso"))
         if v is not None:
             rec["perso_hab"] = round(v, 1)
-
-        # Operating revenue per inhabitant
-        v = safe_float(entry.get("fprod"))
-        if v is not None:
-            rec["prod_hab"] = round(v, 1)
-
-        # Equipment investment per inhabitant
-        v = safe_float(entry.get("fequip"))
-        if v is not None:
-            rec["equip_hab"] = round(v, 1)
-
-        # Population
-        v = safe_int(entry.get("pop1"))
-        if v is not None and v > 0:
-            rec["pop"] = v
 
         if rec:
             result[code] = rec
@@ -367,8 +347,8 @@ def main():
     size_kb = os.path.getsize(output_path) / 1024
     print(f"\nOutput: {output_path} ({size_kb:.0f} KB)", file=sys.stderr)
     print(f"  {len(result)} communes total", file=sys.stderr)
-    for key in ["qpv", "dgf_hab", "dgf", "dette_hab", "cafn_hab", "perso_hab",
-                "prod_hab", "equip_hab", "pop", "rev_med", "tx_pauv"]:
+    for key in ["qpv", "dgf_hab", "dette_hab", "cafn_hab", "perso_hab",
+                "rev_med", "tx_pauv"]:
         count = sum(1 for v in result.values() if key in v)
         print(f"  {key}: {count} communes", file=sys.stderr)
 

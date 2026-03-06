@@ -502,7 +502,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     }
     // Budget capacity from enrichment data
     var enData = enrich[code];
-    if (enData && enData.dgf_hab) {
+    if (enData && enData.dgf_hab !== undefined) {
       signals.budget_capacity = Math.min(enData.dgf_hab / 500, 1);
     } else {
       signals.budget_capacity = 0;
@@ -1096,17 +1096,20 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       if (en.rev_med) {
         addEcoRow('Revenu median', en.rev_med.toLocaleString('fr') + ' \u20ac', '2013', '#e67e22');
       }
+      if (en.tx_pauv !== undefined) {
+        addEcoRow('Taux de pauvrete', en.tx_pauv + ' %', '2013', '#e67e22');
+      }
       if (en.dgf_hab !== undefined) {
         addEcoRow('DGF / habitant', en.dgf_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
       }
       if (en.dette_hab !== undefined) {
-        addEcoRow('Dette / habitant', en.dette_hab.toFixed(1) + ' \u20ac', null, null);
+        addEcoRow('Dette / habitant', en.dette_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
       }
       if (en.cafn_hab !== undefined) {
-        addEcoRow('CAF nette / hab.', en.cafn_hab.toFixed(1) + ' \u20ac', null, null);
+        addEcoRow('CAF nette / hab.', en.cafn_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
       }
       if (en.perso_hab !== undefined) {
-        addEcoRow('Charges personnel / hab.', en.perso_hab.toFixed(1) + ' \u20ac', null, null);
+        addEcoRow('Charges personnel / hab.', en.perso_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
       }
 
       content.appendChild(ecoSec);
@@ -2159,6 +2162,38 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
     var tbody = document.createElement('tbody');
 
+    // "Tous" row to clear activeFilter
+    var trAll = document.createElement('tr');
+    trAll.style.cursor = 'pointer';
+    if (!activeFilter) trAll.style.background = 'rgba(255,255,255,0.04)';
+    trAll.addEventListener('click', function() {
+      activeFilter = null;
+      updateFilter();
+      document.getElementById('cmd-content').textContent = '';
+      renderCmdSecurite();
+    });
+    var tdAll1 = document.createElement('td');
+    tdAll1.style.padding = '4px 6px';
+    tdAll1.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+    tdAll1.style.color = activeFilter ? '#8b8f98' : '#e2e4e9';
+    tdAll1.style.fontWeight = activeFilter ? '400' : '600';
+    tdAll1.textContent = 'Toutes';
+    var tdAll2 = document.createElement('td');
+    tdAll2.style.padding = '4px 6px';
+    tdAll2.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+    tdAll2.style.color = '#8b8f98';
+    var allCount = 0, allSum = 0;
+    for (var fk in famStats) { allCount += famStats[fk].count; allSum += famStats[fk].totalRatio; }
+    tdAll2.textContent = allCount.toString();
+    var tdAll3 = document.createElement('td');
+    tdAll3.style.padding = '4px 6px';
+    tdAll3.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+    tdAll3.style.color = '#e2e4e9';
+    tdAll3.style.fontWeight = '500';
+    tdAll3.textContent = allCount ? (allSum / allCount).toFixed(1) : '-';
+    trAll.appendChild(tdAll1); trAll.appendChild(tdAll2); trAll.appendChild(tdAll3);
+    tbody.appendChild(trAll);
+
     FAMILLES.forEach(function(fam) {
       if (fam.key === 'Non class\u00e9') return;
       var fs = famStats[fam.key];
@@ -2167,8 +2202,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
       var tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
+      if (activeFilter === fam.key) tr.style.background = 'rgba(255,255,255,0.04)';
       tr.addEventListener('click', function() {
-        activeFilter = fam.key;
+        activeFilter = (activeFilter === fam.key) ? null : fam.key;
         updateFilter();
         document.getElementById('cmd-content').textContent = '';
         renderCmdSecurite();
