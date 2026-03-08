@@ -67,9 +67,9 @@ def build_insee_from_dep_icom(dep, icom):
     dep = str(dep).strip()
     icom = str(icom).strip()
 
-    # Strip leading zero from numeric 3-digit departments
-    if len(dep) == 3 and dep.isdigit():
-        dep = dep.lstrip("0") or "0"
+    # Strip leading zero from 3-digit departments (e.g., "050"->"50", "02A"->"2A")
+    if len(dep) == 3 and dep[0] == "0":
+        dep = dep[1:]
 
     code = dep + icom
     # Zero-pad to 5 digits for numeric codes

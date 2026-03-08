@@ -275,12 +275,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   topoData = null;
 
   // Pre-allocated style objects for common cases (avoid 35k allocations per restyle)
-  var STYLE_NO_DATA = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.5 };
-  var STYLE_FILTERED = { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
-  var STYLE_HIDDEN = { fillOpacity: 0, weight: 0, opacity: 0 };
+  var STYLE_NO_DATA = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.5, dashArray: null };
+  var STYLE_FILTERED = { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3, dashArray: null };
+  var STYLE_HIDDEN = { fillOpacity: 0, weight: 0, opacity: 0, dashArray: null };
   var STYLE_NO_DATA_DASHED = { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
-  var STYLE_BELOW_MIN = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3 };
-  var STYLE_ZERO_RATIO = { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4 };
+  var STYLE_BELOW_MIN = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3, dashArray: null };
+  var STYLE_ZERO_RATIO = { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4, dashArray: null };
 
   // Familles in display order
   var FAMILLES = [
@@ -372,7 +372,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fillOpacity: isNC ? 0.3 : 0.8,
       weight: borderWeight,
       color: borderColor,
-      opacity: borderOpacity
+      opacity: borderOpacity,
+      dashArray: null
     };
   }
 
@@ -399,7 +400,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fillOpacity: 0.85,
       weight: 0.3,
       color: '#333',
-      opacity: 0.4
+      opacity: 0.4,
+      dashArray: null
     };
   }
 
@@ -460,6 +462,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     if (prospUpdateTimer) clearTimeout(prospUpdateTimer);
     prospUpdateTimer = setTimeout(function() {
       geoLayer.setStyle(getStyle);
+      prospListLimit = 200;
+      renderProspectList();
+      updateBottomBar();
     }, 50);
   }
 
@@ -572,7 +577,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fillOpacity: 0.8,
       weight: 0.3,
       color: '#222',
-      opacity: 0.5
+      opacity: 0.5,
+      dashArray: null
     };
   }
 
@@ -619,7 +625,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fillOpacity: 0.85,
       weight: 0.3,
       color: '#333',
-      opacity: 0.4
+      opacity: 0.4,
+      dashArray: null
     };
   }
 
@@ -1172,6 +1179,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       });
     }
   }).addTo(map);
+  communesGeo = null;
 
   // Filter update function
   function updateFilter() {
@@ -1393,9 +1401,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         prospWeights[sig.key] = v;
         valSpan.textContent = v.toString();
         scheduleProspRefresh();
-        prospListLimit = 200;
-        renderProspectList();
-        updateBottomBar();
       });
 
       row.appendChild(slider);
