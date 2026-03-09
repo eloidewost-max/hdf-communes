@@ -254,7 +254,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fetchJSON('prospection.json'),
       fetchJSON('communes-topo.json'),
       fetchJSON('delinquance.json'),
-      fetchJSON('enrichment.json')
+      fetchJSON('enrichment.json'),
+      fetchJSON('insights.json')
     ]);
   } catch (err) {
     document.getElementById('load-text').textContent = 'Erreur de chargement';
@@ -268,6 +269,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var topoData = results[3];
   var delinq = results[4];
   var enrich = results[5];
+  var insights = results[6];
 
   status.textContent = 'Construction de la carte...';
 
