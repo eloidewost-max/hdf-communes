@@ -360,6 +360,36 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   var survFilters = { ratioMin: 0, dataOnly: false };
 
+  // --- URL state management ---
+  function updateURL() {
+    var params = new URLSearchParams();
+    if (currentMode !== 'prospection') params.set('mode', currentMode);
+    if (activeFilter) params.set('filter', activeFilter);
+    var qs = params.toString();
+    var url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    history.replaceState(null, '', url);
+  }
+
+  function updateURLWithCommune(code) {
+    var params = new URLSearchParams(window.location.search);
+    if (currentMode !== 'prospection') params.set('mode', currentMode);
+    else params.delete('mode');
+    if (code) params.set('commune', code);
+    else params.delete('commune');
+    var qs = params.toString();
+    var url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    history.pushState(null, '', url);
+  }
+
+  function readURLState() {
+    var params = new URLSearchParams(window.location.search);
+    return {
+      mode: params.get('mode') || 'prospection',
+      commune: params.get('commune') || null,
+      filter: params.get('filter') || null
+    };
+  }
+
   // Style function -- political mode
   function getStylePolitique(feature) {
     var code = feature.properties.codgeo;
@@ -767,6 +797,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var panel = document.getElementById('detail-panel');
     var content = document.getElementById('detail-content');
     content.textContent = '';
+    updateURLWithCommune(code);
 
     var m = maires[code];
     var s = surv[code];
@@ -1328,6 +1359,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // --- Detail panel close ---
   document.querySelector('#detail-close button').addEventListener('click', function() {
     document.getElementById('detail-panel').classList.remove('open');
+    var params = new URLSearchParams(window.location.search);
+    params.delete('commune');
+    var qs = params.toString();
+    history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
   });
 
   // Create GeoJSON layer
@@ -1408,6 +1443,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     // Update mode indicator
     updateModeIndicator();
     updateBottomBar();
+    updateURL();
   }
 
   var modeButtons = document.querySelectorAll('.mode-btn');
@@ -2855,6 +2891,23 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   renderCmdProspection();
   renderMethodo();
   updateBottomBar();
+
+  // Restore state from URL
+  var urlState = readURLState();
+  if (urlState.mode && urlState.mode !== currentMode) {
+    switchMode(urlState.mode);
+  }
+  if (urlState.filter) {
+    activeFilter = urlState.filter;
+    geoLayer.setStyle(getStyle);
+  }
+  if (urlState.commune) {
+    var urlLayer = layerByCode[urlState.commune];
+    if (urlLayer) {
+      map.fitBounds(urlLayer.getBounds());
+      openDetail(urlState.commune);
+    }
+  }
 
   // Initial mode indicator position (after layout is visible)
   setTimeout(updateModeIndicator, 0);
