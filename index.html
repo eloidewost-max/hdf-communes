@@ -294,6 +294,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var insights = results[6];
   mun2026 = results[7];
 
+  // Pre-compute bascule commune codes for efficient glow updates
+  var basculeCodes = [];
+  if (mun2026) {
+    for (var code in mun2026) {
+      if (mun2026[code].cb === 1) basculeCodes.push(code);
+    }
+  }
+
   status.textContent = 'Construction de la carte...';
 
   // Convert TopoJSON to GeoJSON
@@ -384,11 +392,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   function updateURL() {
     var params = new URLSearchParams();
     if (currentMode !== 'prospection') params.set('mode', currentMode);
-    if (activeFilter) params.set('filter', activeFilter);
     if (currentMode === 'municipales2026') {
       if (mun2026Year === '2020') params.set('year', '2020');
-      if (mun2026Filter) params.set('filter', mun2026Filter);
+      if (mun2026Filter) params.set('mfilter', mun2026Filter);
       if (mun2026BlocFilter) params.set('bloc', mun2026BlocFilter);
+    } else if (activeFilter) {
+      params.set('filter', activeFilter);
     }
     var qs = params.toString();
     var url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
@@ -412,6 +421,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       mode: params.get('mode') || 'prospection',
       commune: params.get('commune') || null,
       filter: params.get('filter') || null,
+      mfilter: params.get('mfilter') || null,
       year: params.get('year') || null,
       bloc: params.get('bloc') || null
     };
@@ -733,25 +743,25 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   // Apply/remove bascule glow CSS class on shift communes
   function applyBasculeGlow() {
-    if (!mun2026) return;
-    var isGlow = (currentMode === 'municipales2026' && mun2026Year === '2026');
-    for (var code in layerByCode) {
+    // Strip all existing glows first
+    var existing = document.querySelectorAll('.bascule-glow');
+    for (var i = 0; i < existing.length; i++) existing[i].classList.remove('bascule-glow');
+    if (!(currentMode === 'municipales2026' && mun2026Year === '2026')) return;
+    // Only iterate pre-computed bascule codes
+    for (var i = 0; i < basculeCodes.length; i++) {
+      var code = basculeCodes[i];
       var layer = layerByCode[code];
-      if (!layer._path) continue;
+      if (!layer || !layer.getElement()) continue;
       var d = mun2026[code];
-      if (d && d.cb === 1 && isGlow) {
-        if (mun2026BlocFilter) {
-          var bloc = d.b26 || 'Sans étiquette';
-          if (bloc !== mun2026BlocFilter) { layer._path.classList.remove('bascule-glow'); continue; }
-        }
-        if (mun2026Filter && mun2026Filter !== 'bascules') {
-          if (mun2026Filter === 'nouveaux' && d.nm !== 1) { layer._path.classList.remove('bascule-glow'); continue; }
-          if (mun2026Filter === 't2' && d.st !== 'T2') { layer._path.classList.remove('bascule-glow'); continue; }
-        }
-        layer._path.classList.add('bascule-glow');
-      } else {
-        layer._path.classList.remove('bascule-glow');
+      if (mun2026BlocFilter) {
+        var bloc = d.b26 || 'Sans étiquette';
+        if (bloc !== mun2026BlocFilter) continue;
       }
+      if (mun2026Filter && mun2026Filter !== 'bascules') {
+        if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
+        if (mun2026Filter === 't2' && d.st !== 'T2') continue;
+      }
+      layer.getElement().classList.add('bascule-glow');
     }
   }
 
@@ -797,6 +807,16 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         var sRatio = getSecuRatio(code);
         var catLabel = secuFilter ? (DELINQ_LABELS[secuFilter] || secuFilter) : 'Total';
         infoMetric.textContent = catLabel + ' : ' + (sRatio !== null ? sRatio : 0) + ' /10k hab';
+      } else {
+        infoMetric.textContent = 'Pas de donnees';
+      }
+    } else if (currentMode === 'municipales2026') {
+      var md = mun2026 ? mun2026[code] : null;
+      if (md && md.vt1) {
+        var blocLabel = mun2026Year === '2020' ? (md.b20 || '') : (md.b26 || '');
+        infoMetric.textContent = md.vt1 + (blocLabel ? ' \u2014 ' + blocLabel : '');
+      } else if (md) {
+        infoMetric.textContent = 'Pas de resultat T1';
       } else {
         infoMetric.textContent = 'Pas de donnees';
       }
@@ -1419,9 +1439,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var md = mun2026 ? mun2026[code] : null;
     if (md) {
       var munSec = document.createElement('div');
-      munSec.style.cssText = 'border-top:1px solid #333;padding-top:12px;margin-top:12px;';
+      munSec.className = 'detail-section';
       var munTitle = document.createElement('div');
-      munTitle.style.cssText = 'font-size:11px;font-weight:700;color:#8E24AA;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;';
+      munTitle.className = 'cmd-section-title';
+      munTitle.style.color = '#8E24AA';
       munTitle.textContent = 'Municipales 2026';
       munSec.appendChild(munTitle);
 
@@ -1438,7 +1459,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         sortantDiv.appendChild(sortantName);
         if (md.b20) {
           var sortantBloc = document.createElement('span');
-          sortantBloc.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin-top:2px;color:#fff;background:' + (md.cl20 || '#666') + ';';
+          sortantBloc.className = 'detail-badge';
+          sortantBloc.style.cssText = 'margin-top:2px;color:#fff;background:' + (md.cl20 || '#666') + ';';
           sortantBloc.textContent = md.b20;
           sortantDiv.appendChild(sortantBloc);
         }
@@ -1465,13 +1487,15 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         }
         if (md.b26) {
           var winBloc = document.createElement('span');
-          winBloc.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin:2px 0 2px 14px;color:#fff;background:' + (md.cl26 || '#666') + ';';
+          winBloc.className = 'detail-badge';
+          winBloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.cl26 || '#666') + ';';
           winBloc.textContent = md.b26 + (md.n26 ? ' (' + md.n26 + ')' : '');
           resDiv.appendChild(winBloc);
         }
         if (md.st === 'T2') {
           var t2Badge = document.createElement('span');
-          t2Badge.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:6px;background:#555;color:#ddd;border:1px dashed #888;';
+          t2Badge.className = 'detail-badge';
+          t2Badge.style.cssText = 'margin-left:6px;background:#555;color:#ddd;border:1px dashed #888;';
           t2Badge.textContent = 'Second tour';
           resDiv.appendChild(t2Badge);
         }
@@ -1502,23 +1526,27 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       statusDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
       if (md.cb === 1 && md.sb) {
         var bascBadge = document.createElement('span');
-        bascBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(142,36,170,0.3);color:#CE93D8;border:1px solid #8E24AA;';
+        bascBadge.className = 'detail-badge';
+        bascBadge.style.cssText = 'background:rgba(142,36,170,0.3);color:#CE93D8;border:1px solid #8E24AA;';
         bascBadge.textContent = '\u2726 ' + md.sb;
         statusDiv.appendChild(bascBadge);
       } else if (md.cb === 0) {
         var sameBadge = document.createElement('span');
-        sameBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,255,255,0.05);color:#888;';
+        sameBadge.className = 'detail-badge';
+        sameBadge.style.cssText = 'background:rgba(255,255,255,0.05);color:#888;';
         sameBadge.textContent = '\u2713 M\u00eame bord politique';
         statusDiv.appendChild(sameBadge);
       }
       if (md.nm === 1) {
         var newBadge = document.createElement('span');
-        newBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,183,0,0.2);color:#FFB300;';
+        newBadge.className = 'detail-badge';
+        newBadge.style.cssText = 'background:rgba(255,183,0,0.2);color:#FFB300;';
         newBadge.textContent = '\u2605 Nouveau maire';
         statusDiv.appendChild(newBadge);
       } else if (md.nm === 0) {
         var reconBadge = document.createElement('span');
-        reconBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,255,255,0.05);color:#888;';
+        reconBadge.className = 'detail-badge';
+        reconBadge.style.cssText = 'background:rgba(255,255,255,0.05);color:#888;';
         reconBadge.textContent = '\u2713 Sortant reconduit';
         statusDiv.appendChild(reconBadge);
       }
@@ -2828,10 +2856,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   // --- Command panel: Municipales 2026 mode ---
-  var BLOC_COLORS_JS = {
-    'Extrême gauche': '#B71C1C', 'Gauche': '#E2001A', 'Centre': '#FFB300',
-    'Droite': '#0056A6', 'Extrême droite': '#0D1B4A', 'Divers': '#9E9E9E', 'Sans étiquette': '#666'
-  };
   var MUN_BLOCS = [
     { key: null, label: 'Tous', color: '#aaa' },
     { key: 'Extrême gauche', label: 'Ext. gauche', color: '#B71C1C' },
@@ -2848,8 +2872,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     if (!legendDiv) return;
     legendDiv.textContent = '';
     var title = document.createElement('div');
+    title.className = 'cmd-section-title';
     title.textContent = 'Légende';
-    title.style.cssText = 'font-size:11px;font-weight:600;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;';
     legendDiv.appendChild(title);
     var counts = {};
     var yearKey = mun2026Year === '2020' ? 'b20' : 'b26';
@@ -2862,24 +2886,25 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       if (mun2026BlocFilter && bloc !== mun2026BlocFilter) continue;
       counts[bloc] = (counts[bloc] || 0) + 1;
     }
-    var order = ['Extrême gauche','Gauche','Centre','Droite','Extrême droite','Divers','Sans étiquette'];
-    order.forEach(function(bloc) {
-      if (!counts[bloc]) return;
+    // Iterate MUN_BLOCS (skip "Tous" entry) to get ordered blocs with colors
+    for (var i = 1; i < MUN_BLOCS.length; i++) {
+      var b = MUN_BLOCS[i];
+      if (!counts[b.key]) continue;
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;color:#bbb;';
-      var swatch = document.createElement('span');
-      swatch.style.cssText = 'display:inline-block;width:12px;height:12px;border-radius:2px;flex-shrink:0;background:' + (BLOC_COLORS_JS[bloc] || '#666') + ';';
+      row.className = 'legend-row';
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = b.color;
       row.appendChild(swatch);
       var label = document.createElement('span');
-      label.style.cssText = 'flex:1;';
-      label.textContent = bloc;
+      label.textContent = b.key;
       row.appendChild(label);
       var count = document.createElement('span');
-      count.style.cssText = 'color:#888;font-size:11px;';
-      count.textContent = counts[bloc].toLocaleString('fr');
+      count.className = 'legend-count';
+      count.textContent = counts[b.key].toLocaleString('fr');
       row.appendChild(count);
       legendDiv.appendChild(row);
-    });
+    }
     // Legend notes
     var notes = document.createElement('div');
     notes.style.cssText = 'margin-top:8px;font-size:10px;color:#777;line-height:1.5;';
@@ -2938,13 +2963,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       geoLayer.setStyle(getStyle);
       updateBottomBar();
       updateURL();
+      renderMun2026Legend();
       setTimeout(function() {
         applyBasculeGlow();
-        setTimeout(function() {
-          document.getElementById('map').classList.remove('mun2026-transition');
-        }, 350);
-      }, 150);
-      renderMun2026Legend();
+        document.getElementById('map').classList.remove('mun2026-transition');
+      }, 320);
     }
 
     toggleTrack.appendChild(toggleThumb);
@@ -2959,14 +2982,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
     // Bloc filter pills
     var pillsSection = document.createElement('div');
-    pillsSection.style.cssText = 'padding:8px 10px;display:flex;flex-wrap:wrap;gap:4px;';
+    pillsSection.className = 'cmd-section filter-pills';
     MUN_BLOCS.forEach(function(b) {
+      var isActive = (b.key === mun2026BlocFilter || (b.key === null && mun2026BlocFilter === null));
       var pill = document.createElement('button');
       pill.textContent = b.label;
-      pill.style.cssText = 'padding:3px 8px;border:1px solid #555;border-radius:12px;background:transparent;color:#aaa;font-size:11px;cursor:pointer;transition:all 0.15s;';
-      if (b.key === mun2026BlocFilter || (b.key === null && mun2026BlocFilter === null)) {
-        pill.style.background = b.color;
-        pill.style.color = (b.key === 'Centre' || b.key === 'Divers') ? '#222' : '#fff';
+      pill.className = 'filter-pill' + (isActive ? ' active' : '');
+      if (isActive) {
         pill.style.borderColor = b.color;
       }
       pill.addEventListener('click', function() {
@@ -2982,7 +3004,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
     // Special filters
     var filtersSection = document.createElement('div');
-    filtersSection.style.cssText = 'padding:6px 10px;border-top:1px solid #333;';
+    filtersSection.className = 'cmd-section';
     var SPECIAL_FILTERS = [
       { key: 'bascules', label: 'Bascules uniquement' },
       { key: 'nouveaux', label: 'Nouveaux maires' },
@@ -2990,7 +3012,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     ];
     SPECIAL_FILTERS.forEach(function(sf) {
       var row = document.createElement('label');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;color:#bbb;font-size:12px;';
+      row.className = 'filter-row';
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = (mun2026Filter === sf.key);
@@ -3011,13 +3033,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     // Legend
     var legendDiv = document.createElement('div');
     legendDiv.id = 'mun2026-legend';
-    legendDiv.style.cssText = 'padding:8px 10px;border-top:1px solid #333;';
+    legendDiv.className = 'cmd-section';
     container.appendChild(legendDiv);
     renderMun2026Legend();
 
     // Source note
     var note = document.createElement('div');
-    note.style.cssText = 'padding:8px 10px;border-top:1px solid #333;color:#666;font-size:10px;line-height:1.4;';
+    note.className = 'cmd-section';
+    note.style.cssText = 'color:#666;font-size:10px;line-height:1.4;';
     note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 16/03/2026 (T1)';
     container.appendChild(note);
   }
@@ -3292,13 +3315,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   if (urlState.mode && urlState.mode !== currentMode) {
     switchMode(urlState.mode);
   }
-  if (urlState.filter) {
+  if (urlState.mode !== 'municipales2026' && urlState.filter) {
     activeFilter = urlState.filter;
     geoLayer.setStyle(getStyle);
   }
   if (urlState.mode === 'municipales2026') {
     if (urlState.year === '2020') mun2026Year = '2020';
-    if (urlState.filter) mun2026Filter = urlState.filter;
+    if (urlState.mfilter) mun2026Filter = urlState.mfilter;
     if (urlState.bloc) mun2026BlocFilter = urlState.bloc;
     renderCmdMunicipales2026();
     geoLayer.setStyle(getStyle);
