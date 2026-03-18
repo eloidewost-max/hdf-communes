@@ -206,6 +206,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       <div id="mode-indicator"></div>
     </div>
     <button id="btn-methodo" title="Methodologie et sources">?</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <span id="user-email" style="color:#8b8f98;font-size:12px"></span>
+      <button id="btn-signout" style="display:none;background:none;border:1px solid rgba(255,255,255,0.08);color:#8b8f98;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px" title="Se déconnecter">Déconnexion</button>
+    </div>
   </div>
 
   <div id="cmd-panel">
@@ -240,8 +244,26 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha256-Jc0CrkhsxQY+AhWk5M+xXeg3AMh6xIusTVfcaq8+u4k=" crossorigin="anonymous"></script>
+<!-- IMPORTANT: Replace pk_YOUR_PUBLISHABLE_KEY with your Clerk publishable key -->
+<script data-clerk-publishable-key="pk_test_aW1wcm92ZWQtc3RhZy0yOS5jbGVyay5hY2NvdW50cy5kZXYk" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
 <script>
 (async function() {
+  // Initialize Clerk (sign-out button + user display)
+  if (window.Clerk) {
+    try {
+      await window.Clerk.load();
+      if (window.Clerk.user) {
+        var email = window.Clerk.user.primaryEmailAddress ? window.Clerk.user.primaryEmailAddress.emailAddress : '';
+        document.getElementById('user-email').textContent = email;
+        var btnSignout = document.getElementById('btn-signout');
+        btnSignout.style.display = '';
+        btnSignout.addEventListener('click', function() {
+          window.Clerk.signOut().then(function() { window.location.href = '/sign-in'; });
+        });
+      }
+    } catch(e) { /* Clerk init failed, continue anyway — middleware handles auth */ }
+  }
+
   var map = L.map('map', {
     center: [46.5, 2.5],
     zoom: 6,
