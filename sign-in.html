@@ -47,7 +47,7 @@ body {
             return;
           }
           // Wrong domain — sign out and show login again
-          Clerk.signOut().then(function() {
+          Clerk.signOut({ redirectUrl: '/sign-in' }).then(function() {
             document.getElementById('sign-in-container').insertAdjacentHTML('beforebegin',
               '<p style="color:#e8913a;margin-bottom:16px;text-align:center">Seules les adresses <strong>@vizzia.fr</strong> sont autorisées.</p>'
             );

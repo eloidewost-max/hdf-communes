@@ -258,7 +258,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         var btnSignout = document.getElementById('btn-signout');
         btnSignout.style.display = '';
         btnSignout.addEventListener('click', function() {
-          window.Clerk.signOut().then(function() { window.location.href = '/sign-in'; });
+          window.Clerk.signOut({ redirectUrl: '/sign-in' });
         });
       }
     } catch(e) { /* Clerk init failed, continue anyway — middleware handles auth */ }
