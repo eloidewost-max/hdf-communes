@@ -3526,18 +3526,21 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var q = normalizeSearch(query);
     var matches = [];
 
+    var exactMatches = [];
     var startMatches = [];
     var containsMatches = [];
-    for (var i = 0; i < searchIndex.length && (startMatches.length + containsMatches.length) < 50; i++) {
+    for (var i = 0; i < searchIndex.length; i++) {
       var entry = searchIndex[i];
       var normalized = entry.nameNorm;
-      if (normalized.indexOf(q) === 0) {
+      if (normalized === q) {
+        exactMatches.push(entry);
+      } else if (normalized.indexOf(q) === 0) {
         startMatches.push(entry);
       } else if (normalized.indexOf(q) > 0 || entry.code.indexOf(q) === 0) {
         containsMatches.push(entry);
       }
     }
-    matches = startMatches.concat(containsMatches).slice(0, 8);
+    matches = exactMatches.concat(startMatches).concat(containsMatches).slice(0, 30);
 
     if (matches.length === 0) {
       searchResults.style.display = 'none';
