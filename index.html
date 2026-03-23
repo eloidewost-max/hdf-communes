@@ -760,17 +760,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var code = feature.properties.codgeo;
     var d = mun2026 ? mun2026[code] : null;
     if (!d) return STYLE_NO_DATA;
-    var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.b26 || 'Sans étiquette');
+    var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.bf || d.b26 || 'Sans étiquette');
     if (mun2026BlocFilter && bloc !== mun2026BlocFilter) return STYLE_FILTERED;
     if (mun2026Filter === 'bascules' && d.cb !== 1) return STYLE_FILTERED;
     if (mun2026Filter === 'nouveaux' && d.nm !== 1) return STYLE_FILTERED;
-    if (mun2026Filter === 't2' && d.st !== 'T2') return STYLE_FILTERED;
-    var fillColor = mun2026Year === '2020' ? (d.cl20 || '#666') : (d.cl26 || '#666');
-    if (d.st === 'T2' && mun2026Year === '2026') {
-      return { fillColor: fillColor, fillOpacity: 0.6, weight: 0.5, color: '#888', opacity: 0.6, dashArray: '4 4' };
-    }
+    if (mun2026Filter === 't2' && d.td !== 'T2') return STYLE_FILTERED;
+    var fillColor = mun2026Year === '2020' ? (d.cl20 || '#666') : (d.clf || d.cl26 || '#666');
     if (d.cb === 1 && mun2026Year === '2026') {
       return { fillColor: fillColor, fillOpacity: 0.85, weight: 2.5, color: '#FFFFFF', opacity: 0.9, dashArray: null };
+    }
+    if (d.td === 'T2' && mun2026Year === '2026') {
+      return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.8, color: '#aaa', opacity: 0.7, dashArray: null };
     }
     return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.3, color: '#555', opacity: 0.5, dashArray: null };
   }
@@ -788,12 +788,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       if (!layer || !layer.getElement()) continue;
       var d = mun2026[code];
       if (mun2026BlocFilter) {
-        var bloc = d.b26 || 'Sans étiquette';
+        var bloc = d.bf || d.b26 || 'Sans étiquette';
         if (bloc !== mun2026BlocFilter) continue;
       }
       if (mun2026Filter && mun2026Filter !== 'bascules') {
         if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
-        if (mun2026Filter === 't2' && d.st !== 'T2') continue;
+        if (mun2026Filter === 't2' && d.td !== 'T2') continue;
       }
       layer.getElement().classList.add('bascule-glow');
     }
@@ -846,11 +846,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       }
     } else if (currentMode === 'municipales2026') {
       var md = mun2026 ? mun2026[code] : null;
-      if (md && md.vt1) {
-        var blocLabel = mun2026Year === '2020' ? (md.b20 || '') : (md.b26 || '');
-        infoMetric.textContent = md.vt1 + (blocLabel ? ' \u2014 ' + blocLabel : '');
+      if (md && (md.vf || md.vt1)) {
+        var vainqueur = md.vf || md.vt1;
+        var blocLabel = mun2026Year === '2020' ? (md.b20 || '') : (md.bf || md.b26 || '');
+        var tourTag = md.td === 'T2' ? ' (T2)' : '';
+        infoMetric.textContent = vainqueur + tourTag + (blocLabel ? ' \u2014 ' + blocLabel : '');
       } else if (md) {
-        infoMetric.textContent = 'Pas de resultat T1';
+        infoMetric.textContent = 'Pas de resultat';
       } else {
         infoMetric.textContent = 'Pas de donnees';
       }
@@ -1501,17 +1503,18 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         munSec.appendChild(sortantDiv);
       }
 
+      // --- T1 result block ---
       var resDiv = document.createElement('div');
       resDiv.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:4px;';
       var resLabel = document.createElement('div');
       resLabel.style.cssText = 'font-size:10px;color:#888;margin-bottom:4px;';
-      resLabel.textContent = 'R\u00e9sultat T1 2026';
+      resLabel.textContent = 'R\u00e9sultat T1';
       resDiv.appendChild(resLabel);
 
       if (md.vt1) {
         var winDiv = document.createElement('div');
         winDiv.style.cssText = 'font-size:13px;color:#eee;font-weight:600;';
-        winDiv.textContent = '\u25B6 ' + md.vt1 + (md.sc ? ' \u2014 ' + md.sc + '%' : '');
+        winDiv.textContent = '\u25B6 ' + md.vt1 + (md.sc1 ? ' \u2014 ' + md.sc1 + '%' : '');
         resDiv.appendChild(winDiv);
         if (md.lt1) {
           var listeDiv = document.createElement('div');
@@ -1522,38 +1525,74 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         if (md.b26) {
           var winBloc = document.createElement('span');
           winBloc.className = 'detail-badge';
-          winBloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.cl26 || '#666') + ';';
+          winBloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.cl20 ? md.cl20 : '#666') + ';';
+          // Use b26 (T1 bloc) for the T1 badge color
+          winBloc.style.background = md.b26 ? (({'Extr\u00eame gauche':'#B71C1C','Gauche':'#E2001A','Centre':'#FFB300','Droite':'#0056A6','Extr\u00eame droite':'#0D1B4A','Divers':'#9E9E9E'})[md.b26] || '#666') : '#666';
           winBloc.textContent = md.b26 + (md.n26 ? ' (' + md.n26 + ')' : '');
           resDiv.appendChild(winBloc);
         }
-        if (md.st === 'T2') {
-          var t2Badge = document.createElement('span');
-          t2Badge.className = 'detail-badge';
-          t2Badge.style.cssText = 'margin-left:6px;background:#555;color:#ddd;border:1px dashed #888;';
-          t2Badge.textContent = 'Second tour';
-          resDiv.appendChild(t2Badge);
-        }
       }
 
-      if (md.s2) {
+      if (md.s2t1) {
         var secDiv = document.createElement('div');
         secDiv.style.cssText = 'font-size:12px;color:#999;margin-top:6px;';
-        secDiv.textContent = '\u25B7 ' + md.s2 + (md.sc2 ? ' \u2014 ' + md.sc2 + '%' : '');
+        secDiv.textContent = '\u25B7 ' + md.s2t1 + (md.sc2t1 ? ' \u2014 ' + md.sc2t1 + '%' : '');
         resDiv.appendChild(secDiv);
-        if (md.sc && md.sc2) {
-          var margeDiv = document.createElement('div');
-          margeDiv.style.cssText = 'font-size:11px;color:#777;padding-left:14px;';
-          margeDiv.textContent = 'Marge : +' + (md.sc - md.sc2).toFixed(1) + ' pts';
-          resDiv.appendChild(margeDiv);
-        }
+      }
+      if (md.pa1) {
+        var partDiv = document.createElement('div');
+        partDiv.style.cssText = 'font-size:11px;color:#777;margin-top:4px;';
+        partDiv.textContent = 'Participation : ' + md.pa1 + '%';
+        resDiv.appendChild(partDiv);
       }
       munSec.appendChild(resDiv);
 
-      if (md.pa) {
-        var partDiv = document.createElement('div');
-        partDiv.style.cssText = 'font-size:12px;color:#aaa;margin-bottom:8px;';
-        partDiv.textContent = 'Participation : ' + md.pa + '%';
-        munSec.appendChild(partDiv);
+      // --- T2 result block (only if commune went to T2) ---
+      if (md.td === 'T2' && md.vt2) {
+        var res2Div = document.createElement('div');
+        res2Div.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(142,36,170,0.06);border-radius:4px;border-left:3px solid #8E24AA;';
+        var res2Label = document.createElement('div');
+        res2Label.style.cssText = 'font-size:10px;color:#8E24AA;margin-bottom:4px;font-weight:600;';
+        res2Label.textContent = 'R\u00e9sultat T2 \u2014 \u00c9lu';
+        res2Div.appendChild(res2Label);
+
+        var win2Div = document.createElement('div');
+        win2Div.style.cssText = 'font-size:13px;color:#eee;font-weight:600;';
+        win2Div.textContent = '\u25B6 ' + md.vt2 + (md.sc2 ? ' \u2014 ' + md.sc2 + '%' : '');
+        res2Div.appendChild(win2Div);
+        if (md.lt2) {
+          var liste2Div = document.createElement('div');
+          liste2Div.style.cssText = 'font-size:11px;color:#999;margin:2px 0;padding-left:14px;';
+          liste2Div.textContent = md.lt2;
+          res2Div.appendChild(liste2Div);
+        }
+        if (md.bf) {
+          var win2Bloc = document.createElement('span');
+          win2Bloc.className = 'detail-badge';
+          win2Bloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.clf || '#666') + ';';
+          win2Bloc.textContent = md.bf + (md.nf ? ' (' + md.nf + ')' : '');
+          res2Div.appendChild(win2Bloc);
+        }
+
+        if (md.s2t2) {
+          var sec2Div = document.createElement('div');
+          sec2Div.style.cssText = 'font-size:12px;color:#999;margin-top:6px;';
+          sec2Div.textContent = '\u25B7 ' + md.s2t2 + (md.sc2t2 ? ' \u2014 ' + md.sc2t2 + '%' : '');
+          res2Div.appendChild(sec2Div);
+        }
+        if (md.sc2 && md.sc2t2) {
+          var marge2Div = document.createElement('div');
+          marge2Div.style.cssText = 'font-size:11px;color:#777;padding-left:14px;';
+          marge2Div.textContent = 'Marge : +' + (md.sc2 - md.sc2t2).toFixed(1) + ' pts';
+          res2Div.appendChild(marge2Div);
+        }
+        if (md.pa2) {
+          var part2Div = document.createElement('div');
+          part2Div.style.cssText = 'font-size:11px;color:#777;margin-top:4px;';
+          part2Div.textContent = 'Participation T2 : ' + md.pa2 + '%';
+          res2Div.appendChild(part2Div);
+        }
+        munSec.appendChild(res2Div);
       }
 
       var statusDiv = document.createElement('div');
@@ -2890,13 +2929,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     title.textContent = 'Légende';
     legendDiv.appendChild(title);
     var counts = {};
-    var yearKey = mun2026Year === '2020' ? 'b20' : 'b26';
+    var yearKey = mun2026Year === '2020' ? 'b20' : 'bf';
     for (var code in mun2026) {
       var d = mun2026[code];
       if (mun2026Filter === 'bascules' && d.cb !== 1) continue;
       if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
-      if (mun2026Filter === 't2' && d.st !== 'T2') continue;
-      var bloc = d[yearKey] || 'Sans étiquette';
+      if (mun2026Filter === 't2' && d.td !== 'T2') continue;
+      var bloc = d[yearKey] || d['b26'] || 'Sans étiquette';
       if (mun2026BlocFilter && bloc !== mun2026BlocFilter) continue;
       counts[bloc] = (counts[bloc] || 0) + 1;
     }
@@ -3022,7 +3061,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var SPECIAL_FILTERS = [
       { key: 'bascules', label: 'Bascules uniquement' },
       { key: 'nouveaux', label: 'Nouveaux maires' },
-      { key: 't2', label: 'Second tour' }
+      { key: 't2', label: '\u00c9lus au second tour' }
     ];
     SPECIAL_FILTERS.forEach(function(sf) {
       var row = document.createElement('label');
@@ -3055,7 +3094,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var note = document.createElement('div');
     note.className = 'cmd-section';
     note.style.cssText = 'color:#666;font-size:10px;line-height:1.4;';
-    note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 16/03/2026 (T1)';
+    note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 23/03/2026 (T1+T2)';
     container.appendChild(note);
   }
 
@@ -3116,16 +3155,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       for (var code in mun2026) {
         var md = mun2026[code];
         if (mun2026BlocFilter) {
-          var mBloc = mun2026Year === '2020' ? (md.b20 || 'Sans étiquette') : (md.b26 || 'Sans étiquette');
+          var mBloc = mun2026Year === '2020' ? (md.b20 || 'Sans étiquette') : (md.bf || md.b26 || 'Sans étiquette');
           if (mBloc !== mun2026BlocFilter) continue;
         }
         if (md.cb === 1) munBascules++;
         if (md.nm === 1) munNouveaux++;
-        if (md.st === 'T2') munT2++;
-        if (md.pa) { munPartSum += md.pa; munPartCount++; }
+        if (md.td === 'T2') munT2++;
+        var partVal = md.td === 'T2' ? (md.pa2 || md.pa1) : md.pa1;
+        if (partVal) { munPartSum += partVal; munPartCount++; }
       }
       var munAvgPart = munPartCount > 0 ? (munPartSum / munPartCount).toFixed(1) : '0';
-      el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' en attente T2 | Participation moy. : ' + munAvgPart + '%';
+      el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' \u00e9lus au T2 | Participation moy. : ' + munAvgPart + '%';
     } else {
       var withData = 0;
       var totalRatio = 0;
