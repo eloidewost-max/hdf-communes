@@ -185,6 +185,27 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 }
 .bascule-glow { filter: drop-shadow(0 0 6px rgba(255,255,255,0.8)) drop-shadow(0 0 2px rgba(255,255,255,0.6)); }
 .mun2026-transition .leaflet-overlay-pane svg path { transition: fill 300ms ease, fill-opacity 300ms ease, stroke 300ms ease; }
+.client-label {
+  background: rgba(10,11,16,0.82);
+  color: #FFD700;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid rgba(255,215,0,0.5);
+  line-height: 1.4;
+  transform: translate(-50%, -50%);
+  display: inline-block;
+}
+.client-label.epci-label {
+  font-size: 11px;
+  color: #fff;
+  border-color: rgba(255,215,0,0.8);
+  background: rgba(10,11,16,0.9);
+  letter-spacing: 0.02em;
+}
 </style>
 </head>
 <body>
@@ -208,8 +229,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       <button class="mode-btn" data-mode="surveillance">Surveillance</button>
       <button class="mode-btn" data-mode="securite">Securite</button>
       <button class="mode-btn" data-mode="municipales2026">Municipales 2026</button>
+      <button class="mode-btn" data-mode="epci">EPCI</button>
       <div id="mode-indicator"></div>
     </div>
+    <button id="btn-clients" title="Afficher les clients" style="background:none;border:1px solid rgba(255,255,255,0.08);color:#8b8f98;padding:0 12px;height:30px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s;flex-shrink:0;">Clients</button>
     <button id="btn-methodo" title="Methodologie et sources">?</button>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
       <span id="user-email" style="color:#8b8f98;font-size:12px"></span>
@@ -236,6 +259,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 <div id="info">
   <div id="info-name"></div>
   <div id="info-metric"></div>
+  <div id="info-client" style="display:none;margin-top:4px;font-size:11px;font-weight:700;color:#FFD700;border-top:1px solid rgba(255,215,0,0.25);padding-top:4px;"></div>
 </div>
 
 <div id="methodo-overlay"></div>
@@ -303,6 +327,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   try {
     var insightsP = fetchJSON('insights.json').catch(function(e) { console.warn('insights.json non disponible :', e.message); return {}; });
     var mun2026P = fetchJSON('municipales2026.json').catch(function(e) { console.warn('municipales2026.json non disponible :', e.message); return {}; });
+    var epciP = fetchJSON('epci.json').catch(function(e) { console.warn('epci.json non disponible :', e.message); return {}; });
+    var clientsP = fetchJSON('clients.json').catch(function(e) { console.warn('clients.json non disponible :', e.message); return {}; });
     results = await Promise.all([
       fetchJSON('maires.json'),
       fetchJSON('surveillance.json'),
@@ -311,7 +337,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fetchJSON('delinquance.json'),
       fetchJSON('enrichment.json'),
       insightsP,
-      mun2026P
+      mun2026P,
+      epciP,
+      clientsP
     ]);
   } catch (err) {
     document.getElementById('load-text').textContent = 'Erreur de chargement';
@@ -327,6 +355,42 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var enrich = results[5];
   var insights = results[6];
   mun2026 = results[7];
+  var epci = results[8];
+  var clients = results[9];
+  var showClients = false;
+  var clientLabelsLayer = L.layerGroup();
+
+  function buildClientLabels() {
+    clientLabelsLayer.clearLayers();
+    // Communes directement clientes
+    for (var code in clients) {
+      var cd = clients[code];
+      if (cd.src !== 'commune') continue;
+      var layer = layerByCode[code];
+      if (!layer) continue;
+      var center = layer.getBounds().getCenter();
+      var icon = L.divIcon({ className: '', html: '<div class="client-label">' + cd.name + '</div>', iconSize: null, iconAnchor: [0, 0] });
+      L.marker(center, { icon: icon, interactive: false, zIndexOffset: 500 }).addTo(clientLabelsLayer);
+    }
+    // EPCI clients : un label par EPCI, positionné au centroïde du territoire
+    var epciGroups = {};
+    for (var code in clients) {
+      var cd = clients[code];
+      if (cd.src !== 'epci') continue;
+      var layer = layerByCode[code];
+      if (!layer) continue;
+      var c = layer.getBounds().getCenter();
+      if (!epciGroups[cd.name]) epciGroups[cd.name] = { lat: 0, lng: 0, n: 0 };
+      epciGroups[cd.name].lat += c.lat;
+      epciGroups[cd.name].lng += c.lng;
+      epciGroups[cd.name].n++;
+    }
+    for (var epciName in epciGroups) {
+      var g = epciGroups[epciName];
+      var icon = L.divIcon({ className: '', html: '<div class="client-label epci-label">' + epciName + '</div>', iconSize: null, iconAnchor: [0, 0] });
+      L.marker([g.lat / g.n, g.lng / g.n], { icon: icon, interactive: false, zIndexOffset: 600 }).addTo(clientLabelsLayer);
+    }
+  }
 
   // Pre-compute bascule commune codes for efficient glow updates
   var basculeCodes = [];
@@ -775,6 +839,31 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.3, color: '#555', opacity: 0.5, dashArray: null };
   }
 
+  // --- EPCI types & colors ---
+  var EPCI_TYPES = [
+    { key: 'CC',    label: 'Communaut\u00e9 de Communes',      color: '#bbf7d0', shortLabel: 'CC' },
+    { key: 'CA',    label: 'Communaut\u00e9 d\'Agglom\u00e9ration', color: '#60a5fa', shortLabel: 'CA' },
+    { key: 'CU',    label: 'Communaut\u00e9 Urbaine',           color: '#fb923c', shortLabel: 'CU' },
+    { key: 'METRO', label: 'M\u00e9tropole',                    color: '#f87171', shortLabel: 'M\u00e9tropole' },
+    { key: 'MET69', label: 'M\u00e9tropole de Lyon',            color: '#c084fc', shortLabel: 'M\u00e9tropole Lyon' }
+  ];
+  var epciTypeFilter = null;
+
+  function getStyleEpci(feature) {
+    var code = feature.properties.codgeo;
+    var e = epci[code];
+    if (!e) return STYLE_NO_DATA;
+    if (epciTypeFilter && e.t !== epciTypeFilter) return STYLE_FILTERED;
+    return {
+      fillColor: e.cl,
+      fillOpacity: 0.75,
+      weight: 0.8,
+      color: '#0a0b10',
+      opacity: 0.9,
+      dashArray: null
+    };
+  }
+
   // Apply/remove bascule glow CSS class on shift communes
   function applyBasculeGlow() {
     // Strip all existing glows first
@@ -800,17 +889,40 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   function getStyle(feature) {
-    if (currentMode === 'surveillance') return getStyleSurveillance(feature);
-    if (currentMode === 'prospection') return getStyleProspection(feature);
-    if (currentMode === 'securite') return getStyleSecurite(feature);
-    if (currentMode === 'municipales2026') return getStyleMunicipales2026(feature);
-    return getStylePolitique(feature);
+    var style;
+    if (currentMode === 'surveillance') style = getStyleSurveillance(feature);
+    else if (currentMode === 'prospection') style = getStyleProspection(feature);
+    else if (currentMode === 'securite') style = getStyleSecurite(feature);
+    else if (currentMode === 'municipales2026') style = getStyleMunicipales2026(feature);
+    else if (currentMode === 'epci') style = getStyleEpci(feature);
+    else style = getStylePolitique(feature);
+
+    if (showClients) {
+      var code = feature.properties.codgeo;
+      var clientEntry = clients[code];
+      if (clientEntry) {
+        if (clientEntry.src === 'commune') {
+          // Commune directement cliente : bordure or pleine et épaisse
+          style = { fillColor: style.fillColor, fillOpacity: Math.max(style.fillOpacity || 0.75, 0.8),
+            weight: 2.5, color: '#FFD700', opacity: 1, dashArray: null };
+        } else {
+          // Territoire d'un EPCI client : lavis doré discret, tirets fins
+          style = { fillColor: '#FFD700', fillOpacity: 0.22,
+            weight: 1, color: '#cc9900', opacity: 0.7, dashArray: '4 3' };
+        }
+      } else {
+        style = { fillColor: style.fillColor, fillOpacity: (style.fillOpacity || 0.5) * 0.6,
+          weight: style.weight, color: style.color, opacity: style.opacity * 0.6, dashArray: style.dashArray };
+      }
+    }
+    return style;
   }
 
   // --- Info tooltip (minimal) ---
   var infoPanel = document.getElementById('info');
   var infoName = document.getElementById('info-name');
   var infoMetric = document.getElementById('info-metric');
+  var infoClient = document.getElementById('info-client');
 
   function positionInfo(evt) {
     var x = evt.clientX + 15;
@@ -827,7 +939,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var code = feature.properties.codgeo;
     var m = maires[code];
 
+    var clientData = clients[code];
     infoName.textContent = (m ? m.n : code) + ' (' + code + ')';
+    if (showClients && clientData) {
+      infoClient.textContent = '\u2605 ' + (clientData.src === 'epci' ? 'EPCI client : ' : 'Client : ') + clientData.name;
+      infoClient.style.display = 'block';
+    } else {
+      infoClient.style.display = 'none';
+    }
 
     // Key metric based on mode
     if (currentMode === 'prospection') {
@@ -855,6 +974,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         infoMetric.textContent = 'Pas de resultat';
       } else {
         infoMetric.textContent = 'Pas de donnees';
+      }
+    } else if (currentMode === 'epci') {
+      var e = epci[code];
+      if (e) {
+        var epciTypeObj = EPCI_TYPES.filter(function(t) { return t.key === e.t; })[0];
+        infoMetric.textContent = e.n + ' \u2014 ' + (epciTypeObj ? epciTypeObj.label : e.t);
+      } else {
+        infoMetric.textContent = 'Hors EPCI';
       }
     } else {
       var s = surv[code];
@@ -966,6 +1093,35 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       maireEl.style.marginTop = '4px';
       maireEl.textContent = 'Maire : ' + m.m + ' \u2014 ' + (m.lb || '') + (m.nu ? ' (' + m.nu + ')' : '');
       headerSec.appendChild(maireEl);
+    }
+
+    // Client badge
+    var clientData = clients[code];
+    if (clientData) {
+      var clientBadgeWrap = document.createElement('div');
+      clientBadgeWrap.style.marginTop = '6px';
+      var clientBadge = document.createElement('span');
+      clientBadge.className = 'detail-badge';
+      clientBadge.style.background = '#FFD700';
+      clientBadge.style.color = '#111';
+      clientBadge.textContent = '\u2605 Client — ' + clientData.name;
+      clientBadgeWrap.appendChild(clientBadge);
+      headerSec.appendChild(clientBadgeWrap);
+    }
+
+    // EPCI badge
+    var epciData = epci[code];
+    if (epciData) {
+      var epciTypeObj = EPCI_TYPES.filter(function(t) { return t.key === epciData.t; })[0];
+      var epciBadgeWrap = document.createElement('div');
+      epciBadgeWrap.style.marginTop = '6px';
+      var epciBadge = document.createElement('span');
+      epciBadge.className = 'detail-badge';
+      epciBadge.style.background = epciData.cl;
+      epciBadge.style.color = '#111';
+      epciBadge.textContent = (epciTypeObj ? epciTypeObj.shortLabel : epciData.t) + ' \u2014 ' + epciData.n;
+      epciBadgeWrap.appendChild(epciBadge);
+      headerSec.appendChild(epciBadgeWrap);
     }
 
     content.appendChild(headerSec);
@@ -1656,7 +1812,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         },
         click: function(e) {
           var code = feature.properties.codgeo;
-          map.fitBounds(e.target.getBounds());
           openDetail(code);
         }
       });
@@ -1664,13 +1819,39 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }).addTo(map);
   communesGeo = null;
 
+  // --- EPCI borders layer ---
+  var epciLayer = null;
+  var epciLayerLoading = false;
+
+  function buildEpciLayer(geojson) {
+    if (epciLayer) epciLayer.remove();
+    epciLayer = L.geoJSON(geojson, {
+      style: function() {
+        return { fill: false, weight: 2, color: '#222', opacity: 0.65, dashArray: null };
+      },
+      interactive: false
+    });
+    geoLayer.addTo(map); // re-ensure commune layer is below
+    epciLayer.addTo(map);
+  }
+
+  function setEpciLayer(visible) {
+    if (!visible) { if (epciLayer) epciLayer.remove(); return; }
+    if (epciLayer) { epciLayer.addTo(map); return; }
+    if (epciLayerLoading) return;
+    epciLayerLoading = true;
+    fetchJSON('epci-borders.json').then(function(geojson) {
+      buildEpciLayer(geojson);
+    }).catch(function(e) { console.warn('epci-borders.json non disponible :', e); });
+  }
+
   // Filter update function
   function updateFilter() {
     geoLayer.setStyle(getStyle);
   }
 
   // --- Mode toggle ---
-  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4', securite: '#c0392b', municipales2026: '#8E24AA' };
+  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4', securite: '#c0392b', municipales2026: '#8E24AA', epci: '#34d399' };
   var modeIndicator = document.getElementById('mode-indicator');
 
   function updateModeIndicator() {
@@ -1689,6 +1870,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       for (var g = 0; g < glows.length; g++) glows[g].classList.remove('bascule-glow');
     }
     currentMode = mode;
+    setEpciLayer(mode === 'epci');
     activeFilter = null;
     var btns = document.querySelectorAll('.mode-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -1705,6 +1887,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       secuFilter = null;
       secuFilters = { ratioMin: 0, dataOnly: false };
     }
+    if (mode === 'epci') {
+      epciTypeFilter = null;
+    }
     if (mode === 'municipales2026') {
       mun2026Filter = null;
       mun2026BlocFilter = null;
@@ -1716,6 +1901,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     else if (mode === 'surveillance') renderCmdSurveillance();
     else if (mode === 'securite') renderCmdSecurite();
     else if (mode === 'municipales2026') renderCmdMunicipales2026();
+    else if (mode === 'epci') renderCmdEpci();
 
     // Hide info tooltip
     infoPanel.style.display = 'none';
@@ -3098,10 +3284,125 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     container.appendChild(note);
   }
 
+  // --- renderCmdEpci ---
+  function renderCmdEpci() {
+    var container = document.getElementById('cmd-content');
+    container.textContent = '';
+
+    // Count per type
+    var counts = {};
+    EPCI_TYPES.forEach(function(t) { counts[t.key] = 0; });
+    var epciNames = {}; // siren -> name (for unique EPCI count)
+    for (var code in epci) {
+      var e = epci[code];
+      if (counts[e.t] !== undefined) counts[e.t]++;
+      epciNames[e.siren] = 1;
+    }
+    var nbEpci = Object.keys(epciNames).length;
+
+    // Header
+    var sec = document.createElement('div');
+    sec.className = 'cmd-section';
+    var title = document.createElement('div');
+    title.className = 'cmd-section-title';
+    title.textContent = 'TYPE D\'EPCI';
+    sec.appendChild(title);
+
+    var intro = document.createElement('div');
+    intro.style.cssText = 'font-size:12px;color:#8b8f98;margin-bottom:10px;';
+    intro.textContent = nbEpci.toLocaleString('fr') + ' EPCI \u2014 ' + Object.keys(epci).length.toLocaleString('fr') + ' communes';
+    sec.appendChild(intro);
+
+    var pills = document.createElement('div');
+    pills.className = 'filter-pills';
+
+    // "Tous" pill
+    var allPill = document.createElement('button');
+    allPill.className = 'filter-pill' + (epciTypeFilter === null ? ' active' : '');
+    allPill.style.borderColor = '#34d399';
+    if (epciTypeFilter === null) allPill.style.background = 'rgba(52,211,153,0.15)';
+    allPill.textContent = 'Tous';
+    allPill.addEventListener('click', function() {
+      epciTypeFilter = null;
+      geoLayer.setStyle(getStyle);
+      updateBottomBar();
+      renderCmdEpci();
+    });
+    pills.appendChild(allPill);
+    sec.appendChild(pills);
+    container.appendChild(sec);
+
+    // Legend + filter pills per type
+    var legendSec = document.createElement('div');
+    legendSec.className = 'cmd-section';
+    EPCI_TYPES.forEach(function(typeObj) {
+      var count = counts[typeObj.key] || 0;
+      if (count === 0) return;
+
+      var row = document.createElement('div');
+      row.className = 'legend-row';
+      row.style.cursor = 'pointer';
+      row.style.padding = '3px 0';
+      row.style.borderRadius = '4px';
+      row.style.transition = 'background 0.1s';
+      if (epciTypeFilter === typeObj.key) row.style.background = 'rgba(255,255,255,0.05)';
+
+      var swatch = document.createElement('div');
+      swatch.className = 'legend-swatch';
+      swatch.style.background = typeObj.color;
+      swatch.style.opacity = epciTypeFilter && epciTypeFilter !== typeObj.key ? '0.3' : '1';
+      row.appendChild(swatch);
+
+      var label = document.createElement('span');
+      label.style.color = epciTypeFilter && epciTypeFilter !== typeObj.key ? '#555' : '#e2e4e9';
+      label.textContent = typeObj.label;
+      row.appendChild(label);
+
+      var countEl = document.createElement('span');
+      countEl.className = 'legend-count';
+      countEl.textContent = count.toLocaleString('fr');
+      row.appendChild(countEl);
+
+      row.addEventListener('click', function() {
+        epciTypeFilter = (epciTypeFilter === typeObj.key) ? null : typeObj.key;
+        geoLayer.setStyle(getStyle);
+        updateBottomBar();
+        renderCmdEpci();
+      });
+
+      legendSec.appendChild(row);
+    });
+    container.appendChild(legendSec);
+
+    // No data info
+    var noDataSec = document.createElement('div');
+    noDataSec.className = 'cmd-section';
+    var noDataRow = document.createElement('div');
+    noDataRow.className = 'legend-row';
+    var noDataSwatch = document.createElement('div');
+    noDataSwatch.className = 'legend-swatch';
+    noDataSwatch.style.background = '#444';
+    noDataRow.appendChild(noDataSwatch);
+    var noDataLabel = document.createElement('span');
+    noDataLabel.style.color = '#555';
+    noDataLabel.textContent = 'Hors EPCI / pas de donn\u00e9es';
+    noDataRow.appendChild(noDataLabel);
+    noDataSec.appendChild(noDataRow);
+    container.appendChild(noDataSec);
+  }
+
   // --- updateBottomBar ---
   function updateBottomBar() {
     var el = document.getElementById('bottom-stats');
     if (!el) return;
+
+    if (showClients) {
+      var nbEpciClients = new Set(Object.values(clients).filter(function(c) { return c.src === 'epci'; }).map(function(c) { return c.name; })).size;
+      var comVals = Object.values(clients).filter(function(c) { return c.src === 'commune'; });
+      var nbComClients = comVals.length;
+      el.textContent = '\u2605 ' + nbEpciClients + ' EPCI clients (lavis doré) \u00b7 ' + nbComClients + ' communes directement clientes (bordure or)';
+      return;
+    }
 
     if (currentMode === 'prospection') {
       var filtered = 0;
@@ -3166,6 +3467,19 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       }
       var munAvgPart = munPartCount > 0 ? (munPartSum / munPartCount).toFixed(1) : '0';
       el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' \u00e9lus au T2 | Participation moy. : ' + munAvgPart + '%';
+    } else if (currentMode === 'epci') {
+      var epciCounts = {};
+      EPCI_TYPES.forEach(function(t) { epciCounts[t.key] = 0; });
+      var epciTotal = 0;
+      for (var code in epci) {
+        var et = epci[code].t;
+        if (epciTypeFilter && et !== epciTypeFilter) continue;
+        if (epciCounts[et] !== undefined) epciCounts[et]++;
+        epciTotal++;
+      }
+      var parts = EPCI_TYPES.filter(function(t) { return epciCounts[t.key] > 0; })
+        .map(function(t) { return t.shortLabel + '\u00a0: ' + epciCounts[t.key].toLocaleString('fr'); });
+      el.textContent = epciTotal.toLocaleString('fr') + ' communes | ' + parts.join(' | ');
     } else {
       var withData = 0;
       var totalRatio = 0;
@@ -3201,6 +3515,23 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   btnMethodo.addEventListener('click', toggleMethodo);
   methodoOverlay.addEventListener('click', toggleMethodo);
+
+  // --- Clients toggle ---
+  var btnClients = document.getElementById('btn-clients');
+  btnClients.addEventListener('click', function() {
+    showClients = !showClients;
+    if (showClients) {
+      btnClients.style.background = 'rgba(255,215,0,0.15)';
+      btnClients.style.borderColor = '#FFD700';
+      btnClients.style.color = '#FFD700';
+    } else {
+      btnClients.style.background = 'none';
+      btnClients.style.borderColor = 'rgba(255,255,255,0.08)';
+      btnClients.style.color = '#8b8f98';
+    }
+    geoLayer.setStyle(getStyle);
+    updateBottomBar();
+  });
   document.querySelector('.methodo-close button').addEventListener('click', toggleMethodo);
 
   // --- Search bar ---
@@ -3249,18 +3580,21 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var q = normalizeSearch(query);
     var matches = [];
 
+    var exactMatches = [];
     var startMatches = [];
     var containsMatches = [];
-    for (var i = 0; i < searchIndex.length && (startMatches.length + containsMatches.length) < 50; i++) {
+    for (var i = 0; i < searchIndex.length; i++) {
       var entry = searchIndex[i];
       var normalized = entry.nameNorm;
-      if (normalized.indexOf(q) === 0) {
+      if (normalized === q) {
+        exactMatches.push(entry);
+      } else if (normalized.indexOf(q) === 0) {
         startMatches.push(entry);
       } else if (normalized.indexOf(q) > 0 || entry.code.indexOf(q) === 0) {
         containsMatches.push(entry);
       }
     }
-    matches = startMatches.concat(containsMatches).slice(0, 8);
+    matches = exactMatches.concat(startMatches).concat(containsMatches).slice(0, 30);
 
     if (matches.length === 0) {
       searchResults.style.display = 'none';
